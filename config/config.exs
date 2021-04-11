@@ -13,10 +13,10 @@ config :gaga,
 # Configures the endpoint
 config :gaga, GagaWeb.Endpoint,
   url: [host: "localhost"],
-  secret_key_base: "jVCA5PMwUDrhxl2vYtyJH+DgTYxKIdiytpiXI2AlzYvwAC1JJpqHxLhY8+aDJv2K",
-  render_errors: [view: GagaWeb.ErrorView, accepts: ~w(html json), layout: false],
+  secret_key_base: "nSbDAv/cPbmX+uyTK8ZryLaQEFs/dLwtonBjey7nYwpIg39pc1V/R9bZDFhnATm5",
+  render_errors: [view: GagaWeb.ErrorView, accepts: ~w(json), layout: false],
   pubsub_server: Gaga.PubSub,
-  live_view: [signing_salt: "eJ4AfKQ4"]
+  live_view: [signing_salt: "uw9/bbYE"]
 
 # Configures Elixir's Logger
 config :logger, :console,

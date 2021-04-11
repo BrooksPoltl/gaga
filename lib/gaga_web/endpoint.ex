@@ -7,7 +7,7 @@ defmodule GagaWeb.Endpoint do
   @session_options [
     store: :cookie,
     key: "_gaga_key",
-    signing_salt: "6r67+aUU"
+    signing_salt: "B+dUuAgh"
   ]
 
   socket "/socket", GagaWeb.UserSocket,
@@ -29,8 +29,6 @@ defmodule GagaWeb.Endpoint do
   # Code reloading can be explicitly enabled under the
   # :code_reloader configuration of your endpoint.
   if code_reloading? do
-    socket "/phoenix/live_reload/socket", Phoenix.LiveReloader.Socket
-    plug Phoenix.LiveReloader
     plug Phoenix.CodeReloader
     plug Phoenix.Ecto.CheckRepoStatus, otp_app: :gaga
   end
