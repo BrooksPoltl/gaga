@@ -1,10 +1,11 @@
 defmodule GagaWeb.UserController do
   use GagaWeb, :controller
   alias Gaga.Accounts
-  alias Gaga.Accounts.User
 
-  def index(conn, params) do
+  def index(conn, _params) do
     users = Accounts.list_users()
+    tes = get_session(conn)
+    IO.inspect(tes)
 
     conn
     |> put_resp_content_type("application/json")
@@ -12,13 +13,13 @@ defmodule GagaWeb.UserController do
   end
 
   def create(conn, %{"name" => name}) do
-    IO.inspect(name)
-
     case Accounts.create_user(%{name: name}) do
       {:ok, user} ->
+        token = Phoenix.Token.sign(GagaWeb.Endpoint, System.get_env("TOKEN_SECRET"), user.id)
+
         conn
         |> put_resp_content_type("application/json")
-        |> send_resp(200, Jason.encode!(user))
+        |> send_resp(200, Jason.encode!(%{"user" => user, "token" => token}))
 
       {:error} ->
         {:error, conn}

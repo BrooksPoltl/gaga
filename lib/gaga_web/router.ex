@@ -2,8 +2,9 @@ defmodule GagaWeb.Router do
   use GagaWeb, :router
 
   pipeline :api do
-    plug(CORSPlug, origin: "*")
+    plug(CORSPlug, origin: ["*"])
     plug(:accepts, ["json"])
+    plug(GagaWeb.Plugs.SetUser)
   end
 
   scope "/api", GagaWeb do
