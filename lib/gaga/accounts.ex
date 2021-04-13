@@ -52,7 +52,7 @@ defmodule Gaga.Accounts do
   def create_user(attrs \\ %{}) do
     %User{}
     |> User.changeset(attrs)
-    |> Repo.insert()
+    |> Repo.insert(returning: true)
   end
 
   @doc """

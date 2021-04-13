@@ -16,10 +16,11 @@ defmodule GagaWeb.UserController do
     case Accounts.create_user(%{name: name}) do
       {:ok, user} ->
         token = Phoenix.Token.sign(GagaWeb.Endpoint, System.get_env("TOKEN_SECRET"), user.id)
+        IO.inspect(user)
 
         conn
         |> put_resp_content_type("application/json")
-        |> send_resp(200, Jason.encode!(%{"user" => user, "token" => token}))
+        |> send_resp(201, Jason.encode!(%{"user" => user, "token" => token}))
 
       {:error} ->
         {:error, conn}
