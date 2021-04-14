@@ -8,10 +8,12 @@ defmodule GagaWeb.Router do
   end
 
   scope "/api", GagaWeb do
-    pipe_through(:api)
+    scope "/user" do
+      pipe_through(:api)
 
-    get("/", UserController, :index)
-    options("/", UserController, :options)
-    post("/", UserController, :create)
+      get("/", UserController, :index)
+      options("/", UserController, :options)
+      post("/", UserController, :create)
+    end
   end
 end
