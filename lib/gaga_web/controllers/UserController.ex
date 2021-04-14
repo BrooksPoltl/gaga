@@ -4,8 +4,7 @@ defmodule GagaWeb.UserController do
 
   def index(conn, _params) do
     users = Accounts.list_users()
-    tes = get_session(conn)
-    IO.inspect(tes)
+    IO.inspect(conn)
 
     conn
     |> put_resp_content_type("application/json")
