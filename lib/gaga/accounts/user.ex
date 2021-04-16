@@ -6,7 +6,7 @@ defmodule Gaga.Accounts.User do
   schema "users" do
     field(:cash, :integer)
     field(:name, :string)
-
+    has_one :room, Gaga.Poker.Room
     timestamps()
   end
 

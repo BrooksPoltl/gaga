@@ -7,6 +7,7 @@ defmodule Gaga.Poker do
   alias Gaga.Repo
 
   alias Gaga.Poker.Room
+  alias Gaga.Accounts.User
 
   @doc """
   Returns the list of rooms.
@@ -19,6 +20,7 @@ defmodule Gaga.Poker do
   """
   def list_rooms do
     Repo.all(Room)
+    |> Repo.preload(user: [:room])
   end
 
   @doc """
@@ -49,8 +51,8 @@ defmodule Gaga.Poker do
       {:error, %Ecto.Changeset{}}
 
   """
-  def create_room(attrs \\ %{}) do
-    %Room{}
+  def create_room(attrs \\ %{}, user) do
+    %Room{user_id: user}
     |> Room.changeset(attrs)
     |> Repo.insert()
   end

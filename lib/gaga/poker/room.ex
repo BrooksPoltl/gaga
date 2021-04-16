@@ -2,9 +2,10 @@ defmodule Gaga.Poker.Room do
   use Ecto.Schema
   import Ecto.Changeset
 
+  @derive {Jason.Encoder, only: [:name, :user]}
   schema "rooms" do
     field :name, :string
-    belongs_to :user, Discuss.Accounts.User
+    belongs_to :user, Gaga.Accounts.User
     timestamps()
   end
 

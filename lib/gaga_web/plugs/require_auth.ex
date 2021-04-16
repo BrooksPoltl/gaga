@@ -1,6 +1,5 @@
 defmodule GagaWeb.Plugs.RequireAuth do
   import Plug.Conn
-  import Phoenix.Controller
 
   def init(_params) do
   end

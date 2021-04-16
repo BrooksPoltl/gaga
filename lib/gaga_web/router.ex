@@ -15,5 +15,11 @@ defmodule GagaWeb.Router do
       options("/", UserController, :options)
       post("/", UserController, :create)
     end
+
+    scope "/rooms" do
+      pipe_through(:api)
+      get("/", RoomController, :index)
+      post("/", RoomController, :create)
+    end
   end
 end
