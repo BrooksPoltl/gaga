@@ -2,22 +2,17 @@ defmodule GagaWeb.UserSocket do
   use Phoenix.Socket
 
   ## Channels
-  # channel "room:*", GagaWeb.RoomChannel
+  channel "tables:*", GagaWeb.TableChannel
 
-  # Socket params are passed from the client and can
-  # be used to verify and authenticate a user. After
-  # verification, you can put default assigns into
-  # the socket that will be set for all channels, ie
-  #
-  #     {:ok, assign(socket, :user_id, verified_user_id)}
-  #
-  # To deny connection, return `:error`.
-  #
-  # See `Phoenix.Token` documentation for examples in
-  # performing token verification on connect.
   @impl true
-  def connect(_params, socket, _connect_info) do
-    {:ok, socket}
+  def connect(%{"token" => token}, socket) do
+    case Phoenix.Token.verify(socket, System.get_env("TOKEN_SECRET"), token) do
+      {:ok, user_id} ->
+        {:ok, assign(socket, :user_id, user_id)}
+
+      {:error, _error} ->
+        :error
+    end
   end
 
   # Socket id's are topics that allow you to identify all sockets for a given user:
