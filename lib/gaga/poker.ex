@@ -6,7 +6,7 @@ defmodule Gaga.Poker do
   import Ecto.Query, warn: false
   alias Gaga.Repo
 
-  alias Gaga.Poker.Room
+  alias Gaga.Poker.{Room, RoomUser}
   alias Gaga.Accounts.User
 
   @doc """
@@ -19,8 +19,23 @@ defmodule Gaga.Poker do
 
   """
   def list_rooms do
-    Repo.all(Room)
-    |> Repo.preload(user: [:room])
+    query =
+      from(r in "rooms",
+        left_join: room_user in RoomUser,
+        on: [room_id: r.id],
+        join: user in User,
+        on: [id: r.user_id],
+        group_by: [r.id, r.name, r.user_id, user.name],
+        select: %{
+          name: r.name,
+          user_id: r.user_id,
+          id: r.id,
+          count: count(room_user.id),
+          username: user.name
+        }
+      )
+
+    Repo.all(query)
   end
 
   @doc """

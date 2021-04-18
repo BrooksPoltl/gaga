@@ -6,6 +6,8 @@ defmodule Gaga.Poker.Room do
   schema "rooms" do
     field :name, :string
     belongs_to :user, Gaga.Accounts.User
+    has_many :games, Gaga.Poker.Game
+    many_to_many :users, Gaga.Accounts.User, join_through: "room_users"
     timestamps()
   end
 

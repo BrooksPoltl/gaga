@@ -9,7 +9,8 @@ defmodule Gaga.Poker.Game do
     field :card3, :string
     field :card4, :string
     field :card5, :string
-    field :room_id, :id
+    belongs_to :room, Gaga.Poker.Room
+    many_to_many :rooms, Gaga.Poker.Room, join_through: "room_users"
     field :big_user_id, :id
     field :small_user_id, :id
 
