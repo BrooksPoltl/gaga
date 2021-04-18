@@ -18,6 +18,22 @@ defmodule Gaga.Poker do
       [%Room{}, ...]
 
   """
+  def get_users_at_table(room_id) do
+    query =
+      from(u in "users",
+        join: room_user in RoomUser,
+        on: [user_id: u.id],
+        select: %{
+          username: u.name,
+          user_id: u.id,
+          cash: u.cash
+        },
+        where: room_user.room_id == ^room_id
+      )
+
+    Repo.all(query)
+  end
+
   def list_rooms do
     query =
       from(r in "rooms",
