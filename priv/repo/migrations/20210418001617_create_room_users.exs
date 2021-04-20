@@ -5,7 +5,7 @@ defmodule Gaga.Repo.Migrations.CreateRoomUsers do
     create table(:room_users) do
       add :room_id, references(:rooms, on_delete: :nothing)
       add :user_id, references(:users, on_delete: :nothing)
-      add :sitting_out, boolean, defaults: false
+      add :sitting_out, :boolean, defaults: false
 
       timestamps()
     end

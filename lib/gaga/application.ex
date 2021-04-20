@@ -6,6 +6,8 @@ defmodule Gaga.Application do
   use Application
 
   def start(_type, _args) do
+    import Supervisor.Spec
+
     children = [
       # Start the Ecto repository
       Gaga.Repo,
@@ -14,9 +16,8 @@ defmodule Gaga.Application do
       # Start the PubSub system
       {Phoenix.PubSub, name: Gaga.PubSub},
       # Start the Endpoint (http/https)
-      GagaWeb.Endpoint
-      # Start a worker by calling: Gaga.Worker.start_link(arg)
-      # {Gaga.Worker, arg}
+      GagaWeb.Endpoint,
+      worker(ChannelWatcher, [:tables])
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

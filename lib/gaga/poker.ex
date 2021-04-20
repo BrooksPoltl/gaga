@@ -58,4 +58,15 @@ defmodule Gaga.Poker do
     |> Room.changeset(attrs)
     |> Repo.insert()
   end
+
+  def join_room(attrs \\ %{}) do
+    %RoomUser{}
+    |> RoomUser.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  def leave_room(user_id, room_id) do
+    from(ru in RoomUser, where: ru.user_id == ^user_id and ru.room_id == ^room_id)
+    |> Repo.delete_all()
+  end
 end

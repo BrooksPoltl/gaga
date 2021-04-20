@@ -14,5 +14,6 @@ defmodule Gaga.Poker.RoomUser do
     room_user
     |> cast(attrs, [:room_id, :user_id])
     |> validate_required([:room_id, :user_id])
+    |> unique_constraint(:already_joined, name: :table_member)
   end
 end
