@@ -309,4 +309,65 @@ defmodule Gaga.PokerTest do
       assert %Ecto.Changeset{} = Poker.change_message(message)
     end
   end
+
+  describe "events" do
+    alias Gaga.Poker.Event
+
+    @valid_attrs %{amount: 42, type: "some type"}
+    @update_attrs %{amount: 43, type: "some updated type"}
+    @invalid_attrs %{amount: nil, type: nil}
+
+    def event_fixture(attrs \\ %{}) do
+      {:ok, event} =
+        attrs
+        |> Enum.into(@valid_attrs)
+        |> Poker.create_event()
+
+      event
+    end
+
+    test "list_events/0 returns all events" do
+      event = event_fixture()
+      assert Poker.list_events() == [event]
+    end
+
+    test "get_event!/1 returns the event with given id" do
+      event = event_fixture()
+      assert Poker.get_event!(event.id) == event
+    end
+
+    test "create_event/1 with valid data creates a event" do
+      assert {:ok, %Event{} = event} = Poker.create_event(@valid_attrs)
+      assert event.amount == 42
+      assert event.type == "some type"
+    end
+
+    test "create_event/1 with invalid data returns error changeset" do
+      assert {:error, %Ecto.Changeset{}} = Poker.create_event(@invalid_attrs)
+    end
+
+    test "update_event/2 with valid data updates the event" do
+      event = event_fixture()
+      assert {:ok, %Event{} = event} = Poker.update_event(event, @update_attrs)
+      assert event.amount == 43
+      assert event.type == "some updated type"
+    end
+
+    test "update_event/2 with invalid data returns error changeset" do
+      event = event_fixture()
+      assert {:error, %Ecto.Changeset{}} = Poker.update_event(event, @invalid_attrs)
+      assert event == Poker.get_event!(event.id)
+    end
+
+    test "delete_event/1 deletes the event" do
+      event = event_fixture()
+      assert {:ok, %Event{}} = Poker.delete_event(event)
+      assert_raise Ecto.NoResultsError, fn -> Poker.get_event!(event.id) end
+    end
+
+    test "change_event/1 returns a event changeset" do
+      event = event_fixture()
+      assert %Ecto.Changeset{} = Poker.change_event(event)
+    end
+  end
 end
