@@ -15,20 +15,34 @@ defmodule GagaWeb.TableChannel do
     table_users = Poker.get_users_at_table(room_id)
     # TODO: probably need a way to check if the game is in progress
     if length(table_users) == 2 do
-      {new_table, flop} = start_game(table_users)
-      user = Enum.find(new_table, fn x -> x.user_id == socket.assigns.user_id end)
-      # create a game
-      Poker.create_game(flop, room_id)
+      start_game(table_users, room_id)
 
       # create hands for each player
-      {:reply, {:ok, []}, assign(socket, :hand, user.hand)}
+      {:reply, {:ok, []}, socket}
     end
   end
 
   # If when you join and there are now 2 players start game
   # If game already in progress wait
-  def start_game(table) do
-    PokerLogic.create_game(table)
+  def start_game(table, room_id) do
+    {new_table, flop} = PokerLogic.create_game(table)
+    # user = Enum.find(new_table, fn x -> x.user_id == socket.assigns.user_id end)
+    {:ok, game} = Poker.create_game(flop, room_id)
+    IO.inspect(game.id)
+
+    format_hands =
+      Enum.map(new_table, fn x ->
+        %{
+          card1: Enum.at(x.hand, 0),
+          card2: Enum.at(x.hand, 1),
+          user_id: x.user_id,
+          game_id: game.id,
+          inserted_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second),
+          updated_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+        }
+      end)
+
+    Poker.create_hands(format_hands)
   end
 
   def leave(room_id, user_id) do
