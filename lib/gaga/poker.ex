@@ -2,7 +2,7 @@ defmodule Gaga.Poker do
   import Ecto.Query, warn: false
   alias Gaga.Repo
 
-  alias Gaga.Poker.{Room, RoomUser}
+  alias Gaga.Poker.{Room, RoomUser, Game}
   alias Gaga.Accounts.User
 
   def get_users_at_table(room_id) do
@@ -41,21 +41,25 @@ defmodule Gaga.Poker do
     Repo.all(query)
   end
 
-  @doc """
-  Creates a room.
-
-  ## Examples
-
-      iex> create_room(%{field: value})
-      {:ok, %Room{}}
-
-      iex> create_room(%{field: bad_value})
-      {:error, %Ecto.Changeset{}}
-
-  """
   def create_room(attrs \\ %{}, user) do
     %Room{user_id: user}
     |> Room.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  def create_game(flop, room_id) do
+    IO.inspect(room_id)
+
+    %Game{}
+    |> Game.changeset(%{
+      card1: Enum.at(flop, 0),
+      card2: Enum.at(flop, 1),
+      card3: Enum.at(flop, 2),
+      card4: Enum.at(flop, 3),
+      card5: Enum.at(flop, 4),
+      room_id: room_id,
+      ante: 20
+    })
     |> Repo.insert()
   end
 
