@@ -69,6 +69,9 @@ defmodule Gaga.Poker do
     |> Repo.insert()
   end
 
+  def get_current_game(room_id, user_id) do
+  end
+
   def join_room(attrs \\ %{}) do
     %RoomUser{}
     |> RoomUser.changeset(attrs)

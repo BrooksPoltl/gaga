@@ -37,6 +37,7 @@ defmodule GagaWeb.TableChannel do
           card2: Enum.at(x.hand, 1),
           user_id: x.user_id,
           game_id: game.id,
+          is_active: true,
           inserted_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second),
           updated_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
         }
