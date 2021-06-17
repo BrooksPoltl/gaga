@@ -20,7 +20,13 @@ defmodule GagaWeb.TableChannel do
       game_id = start_game(table_users, room_id)
       game = Poker.get_game_by_room_id(room_id)
       hands = Poker.get_hands_by_game_id(game_id)
-      broadcast(socket, "get_table", %{game: game, hands: hands, new_game: true})
+
+      broadcast(socket, "get_table", %{
+        game: game,
+        hands: hands,
+        new_game: true
+      })
+
       # create hands for each player
     else
       game = Poker.get_game_by_room_id(room_id)
@@ -34,6 +40,8 @@ defmodule GagaWeb.TableChannel do
   def handle_out("get_table", msg, socket) do
     game = %{
       id: msg.game.id,
+      big_user_id: msg.game.big_user_id,
+      small_user_id: msg.game.small_user_id,
       card1:
         if msg.game.shown_flop do
           msg.game.card1
@@ -77,30 +85,24 @@ defmodule GagaWeb.TableChannel do
         end
       end)
 
-    if msg.new_game do
-      push(
-        socket,
-        "get_table",
-        %{game: game, hands: hands}
-      )
-    else
-      push(
-        socket,
-        "get_table",
-        %{game: game, hands: hands}
-      )
+    big_user_index = Enum.find_index(hands, fn x -> game.big_user_id == x.user_id end)
+    IO.inspect(big_user_index)
+
+    if socket.assigns.user_id do
     end
+
+    push(
+      socket,
+      "get_table",
+      %{game: game, hands: hands}
+    )
 
     {:noreply, socket}
   end
 
-  # If when you join and there are now 2 players start game
-  # If game already in progress wait
-  def start_game(table, room_id) do
-    IO.inspect(table)
+  def create_game(table, room_id, big_user_id, small_user_id) do
     {new_table, flop} = PokerLogic.create_game(table)
-    # user = Enum.find(new_table, fn x -> x.user_id == socket.assigns.user_id end)
-    {:ok, game} = Poker.create_game(flop, room_id)
+    {:ok, game} = Poker.create_game(flop, room_id, big_user_id, small_user_id)
 
     formatted_hands =
       Enum.map(new_table, fn x ->
@@ -117,6 +119,21 @@ defmodule GagaWeb.TableChannel do
 
     Poker.create_hands(formatted_hands)
     game.id
+  end
+
+  # If when you join and there are now 2 players start game
+  # If game already in progress wait
+  def start_game(table, room_id, first_game \\ true) do
+    IO.inspect(table)
+
+    if first_game do
+      big_user = Enum.at(table, 0)
+      small_user = Enum.at(table, 1)
+      game_id = create_game(table, room_id, big_user.user_id, small_user.user_id)
+      game_id
+    else
+      # logic to determine big/small blinds
+    end
   end
 
   def leave(room_id, user_id) do

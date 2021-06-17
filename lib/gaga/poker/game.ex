@@ -21,7 +21,27 @@ defmodule Gaga.Poker.Game do
   @doc false
   def changeset(game, attrs) do
     game
-    |> cast(attrs, [:card1, :card2, :card3, :card4, :card5, :ante, :room_id])
-    |> validate_required([:card1, :card2, :card3, :card4, :card5, :ante, :room_id])
+    |> cast(attrs, [
+      :card1,
+      :card2,
+      :card3,
+      :card4,
+      :card5,
+      :ante,
+      :room_id,
+      :big_user_id,
+      :small_user_id
+    ])
+    |> validate_required([
+      :card1,
+      :card2,
+      :card3,
+      :card4,
+      :card5,
+      :ante,
+      :room_id,
+      :big_user_id,
+      :small_user_id
+    ])
   end
 end

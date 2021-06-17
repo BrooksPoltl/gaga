@@ -1,5 +1,6 @@
 defmodule Gaga.Poker do
   import Ecto.Query, warn: false
+  import Ecto.Changeset
   alias Gaga.Repo
 
   alias Gaga.Poker.{Room, RoomUser, Game, Hand}
@@ -54,7 +55,17 @@ defmodule Gaga.Poker do
     |> Repo.transaction()
   end
 
-  def create_game(flop, room_id) do
+  def create_game(flop, room_id, big_user_id, small_user_id) do
+    big_user = Repo.get_by(User, id: big_user_id)
+    small_user = Repo.get_by(User, id: small_user_id)
+    IO.inspect(small_user)
+
+    change(big_user, %{cash: big_user.cash - 40})
+    |> Repo.update()
+
+    change(small_user, %{cash: small_user.cash - 20})
+    |> Repo.update()
+
     %Game{}
     |> Game.changeset(%{
       card1: Enum.at(flop, 0),
@@ -62,6 +73,8 @@ defmodule Gaga.Poker do
       card3: Enum.at(flop, 2),
       card4: Enum.at(flop, 3),
       card5: Enum.at(flop, 4),
+      big_user_id: big_user_id,
+      small_user_id: small_user_id,
       room_id: room_id,
       ante: 20
     })
@@ -105,6 +118,8 @@ defmodule Gaga.Poker do
           card3: g.card3,
           card4: g.card4,
           card5: g.card5,
+          big_user_id: g.big_user_id,
+          small_user_id: g.small_user_id,
           shown_flop: g.shown_flop,
           shown_turn: g.shown_turn,
           shown_river: g.shown_river
