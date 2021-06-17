@@ -54,8 +54,6 @@ defmodule Gaga.Poker do
   end
 
   def create_game(flop, room_id) do
-    IO.inspect(room_id)
-
     %Game{}
     |> Game.changeset(%{
       card1: Enum.at(flop, 0),
@@ -69,7 +67,52 @@ defmodule Gaga.Poker do
     |> Repo.insert()
   end
 
-  def get_current_game(room_id, user_id) do
+  def get_hands_by_game_id(game_id) do
+    get_hands =
+      from(h in "hands",
+        join: game in Game,
+        on: [id: h.game_id],
+        join: ru in RoomUser,
+        on: [user_id: h.user_id, room_id: game.room_id],
+        join: u in User,
+        on: [id: h.user_id],
+        select: %{
+          id: h.id,
+          card1: h.card1,
+          card2: h.card2,
+          user_id: h.user_id,
+          username: u.user_name,
+          is_active: h.is_active
+        },
+        where: h.game_id == ^game_id,
+        order_by: [asc: ru.inserted_at]
+      )
+
+    Repo.all(get_hands)
+  end
+
+  def get_game_by_room_id(room_id) do
+    room_id_int = String.to_integer(room_id)
+
+    get_game =
+      from(g in "games",
+        select: %{
+          id: g.id,
+          card1: g.card1,
+          card2: g.card2,
+          card3: g.card3,
+          card4: g.card4,
+          card5: g.card5,
+          shown_flop: g.shown_flop,
+          shown_turn: g.shown_turn,
+          shown_river: g.shown_river
+        },
+        limit: 1,
+        where: g.room_id == ^room_id_int,
+        order_by: [desc: :inserted_at]
+      )
+
+    Repo.one(get_game)
   end
 
   def join_room(attrs \\ %{}) do
