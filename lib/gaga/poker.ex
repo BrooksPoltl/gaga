@@ -81,7 +81,7 @@ defmodule Gaga.Poker do
           card1: h.card1,
           card2: h.card2,
           user_id: h.user_id,
-          username: u.user_name,
+          name: u.name,
           is_active: h.is_active
         },
         where: h.game_id == ^game_id,

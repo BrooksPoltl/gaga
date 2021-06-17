@@ -97,6 +97,7 @@ defmodule GagaWeb.TableChannel do
   # If when you join and there are now 2 players start game
   # If game already in progress wait
   def start_game(table, room_id) do
+    IO.inspect(table)
     {new_table, flop} = PokerLogic.create_game(table)
     # user = Enum.find(new_table, fn x -> x.user_id == socket.assigns.user_id end)
     {:ok, game} = Poker.create_game(flop, room_id)
