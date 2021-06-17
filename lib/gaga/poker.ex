@@ -15,7 +15,8 @@ defmodule Gaga.Poker do
           user_id: u.id,
           cash: u.cash
         },
-        where: room_user.room_id == ^room_id
+        where: room_user.room_id == ^room_id,
+        order_by: [asc: u.inserted_at]
       )
 
     Repo.all(query)
@@ -82,6 +83,7 @@ defmodule Gaga.Poker do
           card2: h.card2,
           user_id: h.user_id,
           name: u.name,
+          cash: u.cash,
           is_active: h.is_active
         },
         where: h.game_id == ^game_id,

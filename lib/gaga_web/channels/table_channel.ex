@@ -124,6 +124,7 @@ defmodule GagaWeb.TableChannel do
     Poker.leave_room(user_id, room_id)
     # TODO: If its the last user delete the room
     # TODO: Need to find way to handle disconnects that would end game
+    # TODO: wait a little after disconnect to determine if they need to be removed
     IO.inspect("USER IS LEAVING")
   end
 end
