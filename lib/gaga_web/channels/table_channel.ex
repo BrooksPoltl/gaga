@@ -3,7 +3,7 @@ defmodule GagaWeb.TableChannel do
   alias Gaga.Poker
   alias Gaga.Repo
 
-  intercept ["get_table"]
+  intercept ["get_table", "new_turn"]
 
   def join("tables:" <> room_id, _params, socket) do
     user_id = socket.assigns.user_id
@@ -16,85 +16,143 @@ defmodule GagaWeb.TableChannel do
     room_id = socket.assigns.room_id
     table_users = Poker.get_users_at_table(room_id)
     # TODO: probably need a way to check if the game is in progress
-    if length(table_users) == 2 do
-      game_id = start_game(table_users, room_id)
-      game = Poker.get_game_by_room_id(room_id)
-      hands = Poker.get_hands_by_game_id(game_id)
+    cond do
+      length(table_users) == 2 ->
+        game_id = start_game(table_users, room_id)
+        game = Poker.get_game_by_room_id(room_id)
+        hands = Poker.get_hands_by_game_id(game_id)
 
-      broadcast(socket, "get_table", %{
-        game: game,
-        hands: hands,
-        new_game: true
-      })
+        broadcast(socket, "get_table", %{
+          game: game,
+          hands: hands,
+          new_game: true
+        })
 
-      # create hands for each player
-    else
-      game = Poker.get_game_by_room_id(room_id)
-      hands = Poker.get_hands_by_game_id(game.id)
-      broadcast(socket, "get_table", %{game: game, hands: hands, new_game: false})
+      length(table_users) == 1 ->
+        nil
+
+      true ->
+        game = Poker.get_game_by_room_id(room_id)
+        hands = Poker.get_hands_by_game_id(game.id)
+        broadcast(socket, "get_table", %{game: game, hands: hands, new_game: false})
     end
 
     {:reply, {:ok, []}, socket}
   end
 
+  def blur_other_hands(hands, user_id) do
+    Enum.map(hands, fn h ->
+      if h.user_id == user_id do
+        h
+      else
+        h
+        |> Map.put(:card1, nil)
+        |> Map.put(:card2, nil)
+      end
+    end)
+  end
+
   def handle_out("get_table", msg, socket) do
-    game = %{
-      id: msg.game.id,
-      big_user_id: msg.game.big_user_id,
-      small_user_id: msg.game.small_user_id,
-      card1:
-        if msg.game.shown_flop do
-          msg.game.card1
-        else
-          nil
-        end,
-      card2:
-        if msg.game.shown_flop do
-          msg.game.card2
-        else
-          nil
-        end,
-      card3:
-        if msg.game.shown_flop do
-          msg.game.card1
-        else
-          nil
-        end,
-      card4:
-        if msg.game.shown_turn do
-          msg.game.card4
-        else
-          nil
-        end,
-      card5:
-        if msg.game.shown_river do
-          msg.game.card5
-        else
-          nil
-        end
-    }
+    big_user_index = Enum.find_index(msg.hands, fn x -> msg.game.big_user_id == x.user_id end)
 
-    hands =
-      Enum.map(msg.hands, fn h ->
-        if h.user_id == socket.assigns.user_id do
-          h
-        else
-          h
-          |> Map.put(:card1, nil)
-          |> Map.put(:card2, nil)
-        end
-      end)
+    cond do
+      big_user_index + 1 == length(msg.hands) ->
+        broadcast(socket, "new_turn", %{user: Enum.at(msg.hands, 0).user_id, hands: msg.hands})
 
-    big_user_index = Enum.find_index(hands, fn x -> game.big_user_id == x.user_id end)
-    IO.inspect(big_user_index)
-
-    if socket.assigns.user_id do
+      true ->
+        broadcast(socket, "new_turn", %{
+          user: Enum.at(msg.hands, big_user_index + 1).user_id,
+          hands: msg.hands
+        })
     end
 
     push(
       socket,
       "get_table",
-      %{game: game, hands: hands}
+      %{game: msg.game}
+    )
+
+    {:noreply, socket}
+  end
+
+  def handle_in("new_event", %{"body" => body}, socket) do
+    # Validate that the right person is betting
+    game_id = Map.get(body, "gameId")
+    active_user = Poker.find_active_user_by_game_id(game_id)
+
+    if active_user.user_id == socket.assigns.user_id do
+      # Create the event
+      cond do
+        Map.get(body, "event") ==
+            "call" ->
+          amount_to_call = Poker.calculate_amount_to_call(socket.assigns.user_id, game_id)
+
+          event = %{
+            type: "call",
+            user_id: socket.assigns.user_id,
+            game_id: game_id,
+            amount: amount_to_call,
+            inserted_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second),
+            updated_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+          }
+
+          Poker.create_event(event)
+          next_user = Poker.find_active_user_by_game_id(game_id)
+
+          hands = Poker.get_hands_by_game_id(game_id)
+
+          broadcast!(socket, "new_turn", %{user: next_user.user_id, hands: hands})
+
+          broadcast!(socket, "new_event", %{
+            type: "call",
+            amt: amount_to_call,
+            user_id: socket.assigns.user_id
+          })
+
+        Map.get(body, "event") ==
+            "fold" ->
+          event = %{
+            type: "fold",
+            user_id: socket.assigns.user_id,
+            game_id: game_id,
+            amount: 0,
+            inserted_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second),
+            updated_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+          }
+
+          is_game_over? = Poker.create_event(event)
+
+          if is_game_over? do
+            # start_game()
+          else
+            next_user = Poker.find_active_user_by_game_id(game_id)
+
+            hands = Poker.get_hands_by_game_id(game_id)
+
+            broadcast!(socket, "new_turn", %{user: next_user.user_id, hands: hands})
+
+            broadcast!(socket, "new_event", %{
+              type: "fold",
+              amt: 0,
+              user_id: socket.assigns.user_id
+            })
+          end
+      end
+
+      # Send event request to the next person
+    end
+
+    {:reply, {:ok, []}, socket}
+  end
+
+  def handle_out("new_turn", msg, socket) do
+    IO.inspect(socket.assigns.user_id)
+    hands = blur_other_hands(msg.hands, socket.assigns.user_id)
+
+    push(
+      socket,
+      "new_turn",
+      %{user: msg.user, hands: hands}
     )
 
     {:noreply, socket}
@@ -121,7 +179,6 @@ defmodule GagaWeb.TableChannel do
     game.id
   end
 
-  # If when you join and there are now 2 players start game
   # If game already in progress wait
   def start_game(table, room_id, first_game \\ true) do
     IO.inspect(table)

@@ -14,7 +14,6 @@ defmodule GagaWeb.UserController do
   def create(conn, %{"name" => name}) do
     case Accounts.create_user(%{name: name}) do
       {:ok, user} ->
-        IO.inspect(user)
         token = Phoenix.Token.sign(GagaWeb.Endpoint, System.get_env("TOKEN_SECRET"), user.id)
 
         conn

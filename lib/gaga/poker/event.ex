@@ -6,7 +6,7 @@ defmodule Gaga.Poker.Event do
     field :amount, :integer
     field :type, :string
     field :user_id, :id
-    field :room_id, :id
+    field :game_id, :id
 
     timestamps()
   end
@@ -14,7 +14,7 @@ defmodule Gaga.Poker.Event do
   @doc false
   def changeset(event, attrs) do
     event
-    |> cast(attrs, [:type])
-    |> validate_required([:type])
+    |> cast(attrs, [:type, :amount, :user_id, :game_id])
+    |> validate_required([:type, :amount, :user_id, :game_id])
   end
 end

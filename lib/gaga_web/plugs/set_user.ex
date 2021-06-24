@@ -16,7 +16,10 @@ defmodule GagaWeb.Plugs.SetUser do
         conn
         |> assign(:user_id, user_id)
 
-      {:error, _reason} ->
+      {:error, reason} ->
+        IO.puts("ERROR VALIDATING")
+        IO.puts(reason)
+
         conn
         |> assign(:user_id, 0)
     end
