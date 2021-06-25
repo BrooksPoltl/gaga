@@ -287,7 +287,7 @@ defmodule Gaga.Poker do
           join: u in User,
           on: [id: h.user_id],
           join: bu in subquery(inner_query),
-          select: %{user_id: h.user_id},
+          select: %{user_id: h.user_id, username: u.name},
           where: g.id == ^game_id and u.inserted_at > bu.inserted_at and h.is_active == true,
           order_by: [asc: u.inserted_at]
         )
@@ -315,7 +315,7 @@ defmodule Gaga.Poker do
           where: h.game_id == ^game_id and h.is_active == true and u.inserted_at > bu.inserted_at,
           order_by: [asc: u.inserted_at],
           limit: 1,
-          select: %{user_id: u.id}
+          select: %{user_id: u.id, username: u.name}
         )
 
       active_user = Repo.one(get_next_user)
@@ -327,7 +327,7 @@ defmodule Gaga.Poker do
         # Select the use that has the lowest inserted date
         query =
           from(u in User,
-            select: %{user_id: u.id},
+            select: %{user_id: u.id, username: u.name},
             join: h in Hand,
             on: [user_id: u.id],
             limit: 1,

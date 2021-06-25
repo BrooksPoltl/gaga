@@ -3,7 +3,7 @@ defmodule GagaWeb.TableChannel do
   alias Gaga.Poker
   alias Gaga.Repo
 
-  intercept ["get_table", "new_turn"]
+  intercept ["get_table", "new_event", "new_turn"]
 
   def join("tables:" <> room_id, _params, socket) do
     user_id = socket.assigns.user_id
@@ -57,11 +57,20 @@ defmodule GagaWeb.TableChannel do
 
     cond do
       big_user_index + 1 == length(msg.hands) ->
-        broadcast(socket, "new_turn", %{user: Enum.at(msg.hands, 0).user_id, hands: msg.hands})
+        broadcast(socket, "new_turn", %{
+          user: %{
+            user_id: Enum.at(msg.hands, 0).user_id,
+            username: Enum.at(msg.hands, 0).name
+          },
+          hands: msg.hands
+        })
 
       true ->
         broadcast(socket, "new_turn", %{
-          user: Enum.at(msg.hands, big_user_index + 1).user_id,
+          user: %{
+            user_id: Enum.at(msg.hands, big_user_index + 1).user_id,
+            username: Enum.at(msg.hands, big_user_index + 1).name
+          },
           hands: msg.hands
         })
     end
@@ -101,12 +110,11 @@ defmodule GagaWeb.TableChannel do
 
           hands = Poker.get_hands_by_game_id(game_id)
 
-          broadcast!(socket, "new_turn", %{user: next_user.user_id, hands: hands})
-
           broadcast!(socket, "new_event", %{
             type: "call",
             amt: amount_to_call,
-            user_id: socket.assigns.user_id
+            user_id: socket.assigns.user_id,
+            turn: %{user: next_user, hands: hands}
           })
 
         Map.get(body, "event") ==
@@ -129,12 +137,11 @@ defmodule GagaWeb.TableChannel do
 
             hands = Poker.get_hands_by_game_id(game_id)
 
-            broadcast!(socket, "new_turn", %{user: next_user.user_id, hands: hands})
-
             broadcast!(socket, "new_event", %{
               type: "fold",
               amt: 0,
-              user_id: socket.assigns.user_id
+              user_id: socket.assigns.user_id,
+              turn: %{user: next_user, hands: hands}
             })
           end
       end
@@ -146,13 +153,29 @@ defmodule GagaWeb.TableChannel do
   end
 
   def handle_out("new_turn", msg, socket) do
-    IO.inspect(socket.assigns.user_id)
     hands = blur_other_hands(msg.hands, socket.assigns.user_id)
 
     push(
       socket,
       "new_turn",
       %{user: msg.user, hands: hands}
+    )
+
+    {:noreply, socket}
+  end
+
+  def handle_out("new_event", msg, socket) do
+    hands = blur_other_hands(msg.turn.hands, socket.assigns.user_id)
+
+    push(
+      socket,
+      "new_event",
+      %{
+        type: msg.type,
+        amt: msg.amt,
+        user_id: msg.user_id,
+        turn: %{user: msg.turn.user, hands: hands}
+      }
     )
 
     {:noreply, socket}
