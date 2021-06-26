@@ -3,7 +3,7 @@ defmodule GagaWeb.TableChannel do
   alias Gaga.Poker
   alias Gaga.Repo
 
-  intercept ["get_table", "new_event", "new_turn"]
+  intercept ["get_table", "new_event", "new_turn", "new_game"]
 
   def join("tables:" <> room_id, _params, socket) do
     user_id = socket.assigns.user_id
@@ -12,7 +12,7 @@ defmodule GagaWeb.TableChannel do
     {:ok, assign(socket, :room_id, room_id)}
   end
 
-  def handle_in("get_table", _body, socket) do
+  def handle_in("get_table", body, socket) do
     room_id = socket.assigns.room_id
     table_users = Poker.get_users_at_table(room_id)
     # TODO: probably need a way to check if the game is in progress
@@ -56,21 +56,15 @@ defmodule GagaWeb.TableChannel do
     big_user_index = Enum.find_index(msg.hands, fn x -> msg.game.big_user_id == x.user_id end)
 
     cond do
-      big_user_index + 1 == length(msg.hands) ->
+      big_user_index == 0 ->
         broadcast(socket, "new_turn", %{
-          user: %{
-            user_id: Enum.at(msg.hands, 0).user_id,
-            username: Enum.at(msg.hands, 0).name
-          },
+          user_id: Enum.at(msg.hands, length(msg.hands) - 1).user_id,
           hands: msg.hands
         })
 
       true ->
         broadcast(socket, "new_turn", %{
-          user: %{
-            user_id: Enum.at(msg.hands, big_user_index + 1).user_id,
-            username: Enum.at(msg.hands, big_user_index + 1).name
-          },
+          user_id: Enum.at(msg.hands, big_user_index - 1).user_id,
           hands: msg.hands
         })
     end
@@ -84,12 +78,34 @@ defmodule GagaWeb.TableChannel do
     {:noreply, socket}
   end
 
+  def handle_in("new_game", body, socket) do
+    game = Poker.get_game_by_room_id(socket.assigns.room_id)
+    hands = Poker.get_hands_by_game_id(body.game_id)
+
+    broadcast(socket, "new_game", %{
+      game: game,
+      hands: hands
+    })
+  end
+
+  def handle_out("new_game", msg, socket) do
+    hands = blur_other_hands(msg.hands, socket.assigns.user_id)
+
+    push(
+      socket,
+      "new_game",
+      %{game: msg.game, hands: hands, user_id: msg.user_id}
+    )
+
+    {:noreply, socket}
+  end
+
   def handle_in("new_event", %{"body" => body}, socket) do
     # Validate that the right person is betting
     game_id = Map.get(body, "gameId")
-    active_user = Poker.find_active_user_by_game_id(game_id)
+    active_user_id = Poker.find_active_user_by_game_id(game_id)
 
-    if active_user.user_id == socket.assigns.user_id do
+    if active_user_id == socket.assigns.user_id do
       # Create the event
       cond do
         Map.get(body, "event") ==
@@ -106,7 +122,7 @@ defmodule GagaWeb.TableChannel do
           }
 
           Poker.create_event(event)
-          next_user = Poker.find_active_user_by_game_id(game_id)
+          next_user_id = Poker.find_active_user_by_game_id(game_id)
 
           hands = Poker.get_hands_by_game_id(game_id)
 
@@ -114,7 +130,7 @@ defmodule GagaWeb.TableChannel do
             type: "call",
             amt: amount_to_call,
             user_id: socket.assigns.user_id,
-            turn: %{user: next_user, hands: hands}
+            turn: %{user_id: next_user_id, hands: hands}
           })
 
         Map.get(body, "event") ==
@@ -128,20 +144,28 @@ defmodule GagaWeb.TableChannel do
             updated_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
           }
 
+          IO.puts("FOLDINGGGGGG")
           is_game_over? = Poker.create_event(event)
 
           if is_game_over? do
-            # start_game()
+            room_id = socket.assigns.room_id
+            users = Poker.get_users_at_table(room_id)
+            game_id = start_game(users, room_id, false, game_id)
+            game = Poker.get_game_by_room_id(socket.assigns.room_id)
+            hands = Poker.get_hands_by_game_id(game_id)
+            user_id = Poker.find_active_user_by_game_id(game_id)
+            broadcast!(socket, "new_game", %{game: game, hands: hands, user_id: user_id})
           else
-            next_user = Poker.find_active_user_by_game_id(game_id)
+            next_user_id = Poker.find_active_user_by_game_id(game_id)
 
             hands = Poker.get_hands_by_game_id(game_id)
+            IO.puts(next_user_id)
 
             broadcast!(socket, "new_event", %{
               type: "fold",
               amt: 0,
               user_id: socket.assigns.user_id,
-              turn: %{user: next_user, hands: hands}
+              turn: %{user_id: next_user_id, hands: hands}
             })
           end
       end
@@ -158,7 +182,7 @@ defmodule GagaWeb.TableChannel do
     push(
       socket,
       "new_turn",
-      %{user: msg.user, hands: hands}
+      %{user_id: msg.user_id, hands: hands}
     )
 
     {:noreply, socket}
@@ -174,7 +198,7 @@ defmodule GagaWeb.TableChannel do
         type: msg.type,
         amt: msg.amt,
         user_id: msg.user_id,
-        turn: %{user: msg.turn.user, hands: hands}
+        turn: %{user_id: msg.turn.user_id, hands: hands}
       }
     )
 
@@ -203,9 +227,7 @@ defmodule GagaWeb.TableChannel do
   end
 
   # If game already in progress wait
-  def start_game(table, room_id, first_game \\ true) do
-    IO.inspect(table)
-
+  def start_game(table, room_id, first_game \\ true, prev_game_id \\ 0) do
     if first_game do
       big_user = Enum.at(table, 0)
       small_user = Enum.at(table, 1)
@@ -213,6 +235,12 @@ defmodule GagaWeb.TableChannel do
       game_id
     else
       # logic to determine big/small blinds
+      # big and small blind might leave table.
+      next_blinds = Poker.get_next_blind_user_ids(table, prev_game_id)
+      IO.inspect(next_blinds)
+      # if they do we need to still get their created dates to use their dates
+      game_id = create_game(table, room_id, next_blinds.big_user_id, next_blinds.small_user_id)
+      game_id
     end
   end
 
@@ -222,6 +250,7 @@ defmodule GagaWeb.TableChannel do
     # TODO: If its the last user delete the room
     # TODO: Need to find way to handle disconnects that would end game
     # TODO: wait a little after disconnect to determine if they need to be removed
+    # TODO: trigger event for a disconnect or message is probably best if we build messages
     IO.inspect("USER IS LEAVING")
   end
 end

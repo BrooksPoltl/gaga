@@ -14,7 +14,8 @@ defmodule Gaga.Poker do
         select: %{
           username: u.name,
           user_id: u.id,
-          cash: u.cash
+          cash: u.cash,
+          inserted_at: u.inserted_at
         },
         where: room_user.room_id == ^room_id,
         order_by: [asc: u.inserted_at]
@@ -63,6 +64,7 @@ defmodule Gaga.Poker do
     |> Repo.update()
   end
 
+  # returns number
   def get_users_left(game_id) do
     query = from(h in "hands", where: h.game_id == ^game_id and h.is_active == true)
     Repo.aggregate(query, :count, :is_active)
@@ -92,18 +94,46 @@ defmodule Gaga.Poker do
       user_that_is_left = Repo.one(query)
       give_user_money(user_that_is_left.id, pot_size)
       true
+    else
+      false
     end
+  end
 
-    false
+  def check_if_its_end_of_round(game_id, round) do
+    sub_query =
+      from(e in "events",
+        select: %{
+          user_id: e.user_id,
+          amount_paid: fragment("sum(amount)")
+        },
+        where: e.game_id == ^game_id and e.round == ^round,
+        group_by: e.user_id
+      )
+
+    query =
+      from(en in subquery(sub_query),
+        join: e in Event,
+        on: [user_id: en.user_id],
+        where: e.game_id == ^game_id and e.round == ^round and e.type != "ante",
+        group_by: [e.user_id, en.amount_paid],
+        select: %{
+          amount_paid: en.amount_paid,
+          amount_of_events: fragment("count(*)")
+        }
+      )
+
+    vals = Repo.all(query)
+    first = Enum.at(vals, 0)
+
+    Enum.reduce(vals, first.amount_of_events != 0, fn x, acc ->
+      x.amount_paid == first.amount_paid and x.amount_of_events == first.amount_of_events and acc
+    end)
+
+    # edge cases folding?
+    # what if they havent gone yet
   end
 
   def create_event(attrs \\ %{}) do
-    if attrs.type != "fold" do
-      bet_amount(attrs.user_id, attrs.amount)
-    else
-      fold_hand(attrs.user_id, attrs.game_id)
-    end
-
     %Event{}
     |> Event.changeset(attrs)
     |> Repo.insert()
@@ -119,6 +149,45 @@ defmodule Gaga.Poker do
     Ecto.Multi.new()
     |> Ecto.Multi.insert_all(:insert_all, Hand, hands)
     |> Repo.transaction()
+  end
+
+  def get_next_blind_user_ids(users, prev_game_id) do
+    query =
+      from(g in "games",
+        join: u in User,
+        on: fragment("u1.id = g0.big_user_id or u1.id = g0.small_user_id"),
+        where: g.id == ^prev_game_id,
+        select: %{
+          id: u.id,
+          inserted_at: u.inserted_at,
+          big_user_id: g.big_user_id,
+          small_user_id: g.small_user_id
+        }
+      )
+
+    prev_big_and_small_user = Repo.all(query)
+
+    big_user_inserted_at =
+      Enum.find(prev_big_and_small_user, fn x -> x.big_user_id == x.id end).inserted_at
+
+    # Format list so that they are in order starting with new small blind
+    reverse_users = users
+
+    small_user_index =
+      Enum.find_index(reverse_users, fn x ->
+        comparison = NaiveDateTime.compare(x.inserted_at, big_user_inserted_at)
+        IO.inspect(comparison)
+        comparison == :eq or comparison == :gt
+      end)
+
+    {start, end_enum} = Enum.split(reverse_users, small_user_index)
+
+    concat_users = Enum.concat(end_enum, start)
+
+    %{
+      small_user_id: Enum.at(concat_users, 0).user_id,
+      big_user_id: Enum.at(concat_users, 1).user_id
+    }
   end
 
   def create_game(flop, room_id, big_user_id, small_user_id) do
@@ -252,12 +321,14 @@ defmodule Gaga.Poker do
     end
   end
 
-  def find_active_user_by_game_id(game_id) do
-    # TODO: this logic could have been easily done in the programming language
-    # but was much harder and messier in sql
-    # refactor to just pull all active users and determine which one should be next
+  def get_big_user_id(game_id) do
+    query = from(g in "games", select: %{id: g.big_user_id}, where: g.id == ^game_id)
 
-    # if there is no events follow same logic as hands
+    user_obj = Repo.one(query)
+    user_obj.id
+  end
+
+  def find_active_user_by_game_id(game_id) do
     get_event =
       from(e in "events",
         select: %{id: e.id, user_id: e.user_id},
@@ -269,79 +340,31 @@ defmodule Gaga.Poker do
     event = Repo.one(get_event)
 
     if event == nil do
-      inner_query =
-        from(
-          g in "games",
-          join: u in User,
-          on: [id: g.big_user_id],
-          select: %{inserted_at: u.inserted_at},
-          where: g.id == ^game_id
-        )
+      get_users = get_hands_by_game_id(game_id)
+      get_active_users = Enum.filter(get_users, fn x -> x.is_active == true end)
+      big_user_id = get_big_user_id(game_id)
 
-      get_user_if_not_at_start_of_table =
-        from(
-          g in "games",
-          limit: 1,
-          join: h in Hand,
-          on: [game_id: g.id],
-          join: u in User,
-          on: [id: h.user_id],
-          join: bu in subquery(inner_query),
-          select: %{user_id: h.user_id, username: u.name},
-          where: g.id == ^game_id and u.inserted_at > bu.inserted_at and h.is_active == true,
-          order_by: [asc: u.inserted_at]
-        )
+      big_user_index = Enum.find_index(get_active_users, fn x -> x.user_id == big_user_id end)
 
-      active_user = Repo.one(get_user_if_not_at_start_of_table)
-
-      if active_user do
-        active_user
+      if big_user_index == 0 do
+        Enum.at(get_active_users, length(get_active_users) - 1).user_id
       else
-        # TODO:  when new game starts need to handle this
-        IO.puts("ISSUE WITH FINDING USER")
+        Enum.at(get_active_users, big_user_index - 1).user_id
       end
     else
-      inner_query =
-        from(u in User,
-          select: %{inserted_at: u.inserted_at},
-          where: u.id == ^event.user_id
-        )
+      get_users = get_hands_by_game_id(game_id)
+      reverse_users = Enum.reverse(get_users)
+      event_user_index = Enum.find_index(reverse_users, fn x -> x.user_id == event.user_id end)
 
-      get_next_user =
-        from(u in User,
-          join: h in Hand,
-          on: [user_id: u.id],
-          left_join: bu in subquery(inner_query),
-          where: h.game_id == ^game_id and h.is_active == true and u.inserted_at > bu.inserted_at,
-          order_by: [asc: u.inserted_at],
-          limit: 1,
-          select: %{user_id: u.id, username: u.name}
-        )
+      {start, end_enum} = Enum.split(reverse_users, event_user_index)
 
-      active_user = Repo.one(get_next_user)
+      concat_user =
+        [end_enum, start]
+        |> Enum.concat()
 
-      if active_user do
-        active_user
-      else
-        # TODO: when new game starts need to handle if this works or not for 3?
-        # Select the use that has the lowest inserted date
-        query =
-          from(u in User,
-            select: %{user_id: u.id, username: u.name},
-            join: h in Hand,
-            on: [user_id: u.id],
-            limit: 1,
-            where: h.game_id == ^game_id and h.is_active == true,
-            order_by: [asc: u.inserted_at]
-          )
-
-        Repo.one(query)
-      end
-
-      # find user after event user_id
+      get_rid_of_first = Enum.slice(concat_user, 1, length(concat_user))
+      Enum.find(get_rid_of_first, fn x -> x.is_active end).user_id
     end
-
-    # if there is event take most recent event and find user after
   end
 
   def join_room(attrs \\ %{}) do
