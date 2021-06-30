@@ -99,6 +99,59 @@ defmodule Gaga.Poker do
     end
   end
 
+  def get_round_and_check_if_end(game_id) do
+    round = get_round_by_game_id(game_id)
+    check_if_its_end_of_round(game_id, round)
+  end
+
+  def get_round_by_game_id(game_id) do
+    query =
+      from(g in "games",
+        select: %{shown_flop: g.shown_flop, shown_turn: g.shown_turn, shown_river: g.shown_river},
+        where: g.id == ^game_id
+      )
+
+    game = Repo.one(query)
+
+    cond do
+      game.shown_river ->
+        3
+
+      game.shown_turn ->
+        2
+
+      game.shown_flop ->
+        1
+
+      true ->
+        0
+    end
+  end
+
+  def increment_round_and_get_game(game_id) do
+    round = get_round_by_game_id(game_id)
+    game = Repo.get_by(Game, id: game_id)
+
+    cond do
+      round == 0 ->
+        change(game, %{shown_flop: true})
+        |> Repo.update()
+
+      round == 1 ->
+        change(game, %{shown_turn: true})
+        |> Repo.update()
+
+      round == 2 ->
+        change(game, %{shown_river: true})
+        |> Repo.update()
+
+      true ->
+        IO.puts("GAME_OVER")
+    end
+
+    get_game_by_id(game_id)
+  end
+
   def check_if_its_end_of_round(game_id, round) do
     sub_query =
       from(e in "events",
@@ -118,24 +171,48 @@ defmodule Gaga.Poker do
         group_by: [e.user_id, en.amount_paid],
         select: %{
           amount_paid: en.amount_paid,
-          amount_of_events: fragment("count(*)")
+          amount_of_events: fragment("count(*)"),
+          user_id: e.user_id
         }
       )
 
     vals = Repo.all(query)
     first = Enum.at(vals, 0)
 
-    Enum.reduce(vals, first.amount_of_events != 0, fn x, acc ->
-      x.amount_paid == first.amount_paid and x.amount_of_events == first.amount_of_events and acc
-    end)
+    is_events_and_amount_even? =
+      Enum.reduce(vals, first.amount_of_events != 0, fn x, acc ->
+        x.amount_paid == first.amount_paid and x.amount_of_events == first.amount_of_events and
+          acc
+      end)
+
+    query2 =
+      from(h in "hands",
+        where: h.game_id == ^game_id and h.is_active == true,
+        select: %{user_id: h.user_id}
+      )
+
+    hands = Repo.all(query2)
 
     # edge cases folding?
     # what if they havent gone yet
+    filtered_folds =
+      Enum.filter(vals, fn x ->
+        Enum.find(hands, fn y -> y.user_id == x.user_id end) != nil
+      end)
+
+    if Enum.count(hands) == Enum.count(filtered_folds) do
+      is_events_and_amount_even?
+    else
+      false
+    end
   end
 
   def create_event(attrs \\ %{}) do
+    round = get_round_by_game_id(attrs.game_id)
+    attrs_and_round = Map.put(attrs, :round, round)
+
     %Event{}
-    |> Event.changeset(attrs)
+    |> Event.changeset(attrs_and_round)
     |> Repo.insert()
 
     if attrs.type != "fold" do
@@ -255,9 +332,9 @@ defmodule Gaga.Poker do
   def set_value_if_true(val, bool) do
     if bool do
       val
+    else
+      nil
     end
-
-    nil
   end
 
   def get_game_by_room_id(room_id) do
@@ -282,6 +359,36 @@ defmodule Gaga.Poker do
         limit: 1,
         where: g.room_id == ^room_id_int,
         order_by: [desc: :inserted_at]
+      )
+
+    game = Repo.one(get_game)
+
+    Map.put(game, :card1, set_value_if_true(game.card1, game.shown_flop))
+    |> Map.put(:card2, set_value_if_true(game.card2, game.shown_flop))
+    |> Map.put(:card3, set_value_if_true(game.card3, game.shown_flop))
+    |> Map.put(:card4, set_value_if_true(game.card4, game.shown_turn))
+    |> Map.put(:card5, set_value_if_true(game.card5, game.shown_river))
+  end
+
+  def get_game_by_id(game_id) do
+    get_game =
+      from(g in "games",
+        select: %{
+          id: g.id,
+          card1: g.card1,
+          card2: g.card2,
+          card3: g.card3,
+          card4: g.card4,
+          card5: g.card5,
+          room_id: g.room_id,
+          big_user_id: g.big_user_id,
+          small_user_id: g.small_user_id,
+          shown_flop: g.shown_flop,
+          shown_turn: g.shown_turn,
+          shown_river: g.shown_river
+        },
+        limit: 1,
+        where: g.id == ^game_id
       )
 
     game = Repo.one(get_game)

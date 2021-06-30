@@ -129,6 +129,7 @@ defmodule GagaWeb.TableChannel do
           broadcast!(socket, "new_event", %{
             type: "call",
             amt: amount_to_call,
+            game_id: game_id,
             user_id: socket.assigns.user_id,
             turn: %{user_id: next_user_id, hands: hands}
           })
@@ -144,7 +145,6 @@ defmodule GagaWeb.TableChannel do
             updated_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
           }
 
-          IO.puts("FOLDINGGGGGG")
           is_game_over? = Poker.create_event(event)
 
           if is_game_over? do
@@ -159,11 +159,11 @@ defmodule GagaWeb.TableChannel do
             next_user_id = Poker.find_active_user_by_game_id(game_id)
 
             hands = Poker.get_hands_by_game_id(game_id)
-            IO.puts(next_user_id)
 
             broadcast!(socket, "new_event", %{
               type: "fold",
               amt: 0,
+              game_id: game_id,
               user_id: socket.assigns.user_id,
               turn: %{user_id: next_user_id, hands: hands}
             })
@@ -190,17 +190,34 @@ defmodule GagaWeb.TableChannel do
 
   def handle_out("new_event", msg, socket) do
     hands = blur_other_hands(msg.turn.hands, socket.assigns.user_id)
+    is_end_of_round? = Poker.get_round_and_check_if_end(msg.game_id)
 
-    push(
-      socket,
-      "new_event",
-      %{
-        type: msg.type,
-        amt: msg.amt,
-        user_id: msg.user_id,
-        turn: %{user_id: msg.turn.user_id, hands: hands}
-      }
-    )
+    if is_end_of_round? do
+      game = Poker.increment_round_and_get_game(msg.game_id)
+
+      push(
+        socket,
+        "new_event",
+        %{
+          type: msg.type,
+          amt: msg.amt,
+          user_id: msg.user_id,
+          game: game,
+          turn: %{user_id: msg.turn.user_id, hands: hands}
+        }
+      )
+    else
+      push(
+        socket,
+        "new_event",
+        %{
+          type: msg.type,
+          amt: msg.amt,
+          user_id: msg.user_id,
+          turn: %{user_id: msg.turn.user_id, hands: hands}
+        }
+      )
+    end
 
     {:noreply, socket}
   end
