@@ -190,10 +190,15 @@ defmodule GagaWeb.TableChannel do
 
   def handle_out("new_event", msg, socket) do
     hands = blur_other_hands(msg.turn.hands, socket.assigns.user_id)
+    # TODO: this should probably happen higher rather than for every person
     is_end_of_round? = Poker.get_round_and_check_if_end(msg.game_id)
 
     if is_end_of_round? do
       game = Poker.increment_round_and_get_game(msg.game_id)
+
+      new_hands =
+        hands
+        |> Enum.map(fn x -> Map.replace(x, :amount_bet_this_round, 0) end)
 
       push(
         socket,
@@ -203,7 +208,7 @@ defmodule GagaWeb.TableChannel do
           amt: msg.amt,
           user_id: msg.user_id,
           game: game,
-          turn: %{user_id: msg.turn.user_id, hands: hands}
+          turn: %{user_id: msg.turn.user_id, hands: new_hands}
         }
       )
     else

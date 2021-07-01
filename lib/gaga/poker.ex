@@ -305,6 +305,18 @@ defmodule Gaga.Poker do
   end
 
   def get_hands_by_game_id(game_id) do
+    round = get_round_by_game_id(game_id)
+
+    sub_query =
+      from(e in "events",
+        group_by: [e.user_id, e.round, e.game_id],
+        select: %{
+          user_id: e.user_id,
+          amount_bet_this_round: sum(e.amount)
+        },
+        where: e.round == ^round and e.game_id == ^game_id
+      )
+
     get_hands =
       from(h in "hands",
         join: game in Game,
@@ -313,6 +325,8 @@ defmodule Gaga.Poker do
         on: [user_id: h.user_id, room_id: game.room_id],
         join: u in User,
         on: [id: h.user_id],
+        left_join: su in subquery(sub_query),
+        on: su.user_id == h.user_id,
         select: %{
           id: h.id,
           card1: h.card1,
@@ -320,7 +334,8 @@ defmodule Gaga.Poker do
           user_id: h.user_id,
           name: u.name,
           cash: u.cash,
-          is_active: h.is_active
+          is_active: h.is_active,
+          amount_bet_this_round: su.amount_bet_this_round
         },
         where: h.game_id == ^game_id,
         order_by: [asc: u.inserted_at]
@@ -371,8 +386,17 @@ defmodule Gaga.Poker do
   end
 
   def get_game_by_id(game_id) do
+    sub_query =
+      from(e in "events",
+        group_by: [e.game_id],
+        select: %{pot_size: sum(e.amount), game_id: e.game_id},
+        where: e.game_id == ^game_id
+      )
+
     get_game =
       from(g in "games",
+        join: su in subquery(sub_query),
+        on: [game_id: g.id],
         select: %{
           id: g.id,
           card1: g.card1,
@@ -385,7 +409,8 @@ defmodule Gaga.Poker do
           small_user_id: g.small_user_id,
           shown_flop: g.shown_flop,
           shown_turn: g.shown_turn,
-          shown_river: g.shown_river
+          shown_river: g.shown_river,
+          pot_size: su.pot_size
         },
         limit: 1,
         where: g.id == ^game_id
@@ -436,6 +461,8 @@ defmodule Gaga.Poker do
   end
 
   def find_active_user_by_game_id(game_id) do
+    IO.inspect("CALLED THIS")
+
     get_event =
       from(e in "events",
         select: %{id: e.id, user_id: e.user_id},
@@ -460,9 +487,9 @@ defmodule Gaga.Poker do
       end
     else
       get_users = get_hands_by_game_id(game_id)
+      IO.inspect(get_users)
       reverse_users = Enum.reverse(get_users)
       event_user_index = Enum.find_index(reverse_users, fn x -> x.user_id == event.user_id end)
-
       {start, end_enum} = Enum.split(reverse_users, event_user_index)
 
       concat_user =
