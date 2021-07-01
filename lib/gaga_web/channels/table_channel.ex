@@ -259,7 +259,6 @@ defmodule GagaWeb.TableChannel do
       # logic to determine big/small blinds
       # big and small blind might leave table.
       next_blinds = Poker.get_next_blind_user_ids(table, prev_game_id)
-      IO.inspect(next_blinds)
       # if they do we need to still get their created dates to use their dates
       game_id = create_game(table, room_id, next_blinds.big_user_id, next_blinds.small_user_id)
       game_id

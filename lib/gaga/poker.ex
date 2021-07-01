@@ -253,7 +253,6 @@ defmodule Gaga.Poker do
     small_user_index =
       Enum.find_index(reverse_users, fn x ->
         comparison = NaiveDateTime.compare(x.inserted_at, big_user_inserted_at)
-        IO.inspect(comparison)
         comparison == :eq or comparison == :gt
       end)
 
@@ -461,8 +460,6 @@ defmodule Gaga.Poker do
   end
 
   def find_active_user_by_game_id(game_id) do
-    IO.inspect("CALLED THIS")
-
     get_event =
       from(e in "events",
         select: %{id: e.id, user_id: e.user_id},
@@ -475,19 +472,25 @@ defmodule Gaga.Poker do
 
     if event == nil do
       get_users = get_hands_by_game_id(game_id)
-      get_active_users = Enum.filter(get_users, fn x -> x.is_active == true end)
       big_user_id = get_big_user_id(game_id)
+      reverse_users = Enum.reverse(get_users)
+      big_user_index = Enum.find_index(reverse_users, fn x -> x.user_id == big_user_id end)
 
-      big_user_index = Enum.find_index(get_active_users, fn x -> x.user_id == big_user_id end)
+      {start, end_enum} = Enum.split(reverse_users, big_user_index)
 
-      if big_user_index == 0 do
-        Enum.at(get_active_users, length(get_active_users) - 1).user_id
+      concat_user =
+        [end_enum, start]
+        |> Enum.concat()
+
+      if length(concat_user) == 2 do
+        Enum.at(get_users, length(get_users) - 1).user_id
       else
-        Enum.at(get_active_users, big_user_index - 1).user_id
+        get_rid_of_first_two = Enum.slice(concat_user, 2, length(concat_user))
+        Enum.at(Enum.reverse(get_rid_of_first_two), 0).user_id
       end
     else
       get_users = get_hands_by_game_id(game_id)
-      IO.inspect(get_users)
+
       reverse_users = Enum.reverse(get_users)
       event_user_index = Enum.find_index(reverse_users, fn x -> x.user_id == event.user_id end)
       {start, end_enum} = Enum.split(reverse_users, event_user_index)
@@ -497,7 +500,7 @@ defmodule Gaga.Poker do
         |> Enum.concat()
 
       get_rid_of_first = Enum.slice(concat_user, 1, length(concat_user))
-      Enum.find(get_rid_of_first, fn x -> x.is_active end).user_id
+      Enum.find(Enum.reverse(get_rid_of_first), fn x -> x.is_active end).user_id
     end
   end
 
