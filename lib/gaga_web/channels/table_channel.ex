@@ -168,6 +168,35 @@ defmodule GagaWeb.TableChannel do
               turn: %{user_id: next_user_id, hands: hands}
             })
           end
+
+        Map.get(body, "event") ==
+            "raise" ->
+          IO.inspect(body)
+          amount_to_call = Poker.calculate_amount_to_call(socket.assigns.user_id, game_id)
+          # TODO: add validation to make sure its a valid raise and they are capable
+          raise_amount = amount_to_call + Map.get(body, "amt")
+
+          event = %{
+            type: "raise",
+            user_id: socket.assigns.user_id,
+            game_id: game_id,
+            amount: raise_amount,
+            inserted_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second),
+            updated_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+          }
+
+          Poker.create_event(event)
+          next_user_id = Poker.find_active_user_by_game_id(game_id)
+
+          hands = Poker.get_hands_by_game_id(game_id)
+
+          broadcast!(socket, "new_event", %{
+            type: "raise",
+            amt: Map.get(body, "amt"),
+            game_id: game_id,
+            user_id: socket.assigns.user_id,
+            turn: %{user_id: next_user_id, hands: hands}
+          })
       end
 
       # Send event request to the next person

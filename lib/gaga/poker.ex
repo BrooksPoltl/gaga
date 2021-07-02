@@ -179,9 +179,15 @@ defmodule Gaga.Poker do
     vals = Repo.all(query)
     first = Enum.at(vals, 0)
 
-    is_events_and_amount_even? =
+    is_amount_even? =
       Enum.reduce(vals, first.amount_of_events != 0, fn x, acc ->
-        x.amount_paid == first.amount_paid and x.amount_of_events == first.amount_of_events and
+        x.amount_paid == first.amount_paid and
+          acc
+      end)
+
+    is_events_even? =
+      Enum.reduce(vals, first.amount_of_events != 0, fn x, acc ->
+        x.amount_of_events == first.amount_of_events and
           acc
       end)
 
@@ -193,15 +199,21 @@ defmodule Gaga.Poker do
 
     hands = Repo.all(query2)
 
-    # edge cases folding?
-    # what if they havent gone yet
     filtered_folds =
       Enum.filter(vals, fn x ->
         Enum.find(hands, fn y -> y.user_id == x.user_id end) != nil
       end)
 
     if Enum.count(hands) == Enum.count(filtered_folds) do
-      is_events_and_amount_even?
+      if is_amount_even? and is_events_even? do
+        true
+      else
+        if first.amount_paid != 0 do
+          is_amount_even?
+        else
+          false
+        end
+      end
     else
       false
     end

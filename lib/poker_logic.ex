@@ -42,4 +42,7 @@ defmodule PokerLogic do
       {new_user, new_deck}
     end)
   end
+
+  def find_payout() do
+  end
 end
