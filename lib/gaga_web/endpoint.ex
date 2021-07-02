@@ -11,7 +11,7 @@ defmodule GagaWeb.Endpoint do
   ]
 
   socket("/socket", GagaWeb.UserSocket,
-    websocket: true,
+    websocket: [timeout: 45_000],
     longpoll: false
   )
 
