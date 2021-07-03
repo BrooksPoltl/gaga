@@ -43,6 +43,52 @@ defmodule PokerLogic do
     end)
   end
 
-  def find_payout() do
+  defp parse_rank("J"), do: 11
+  defp parse_rank("Q"), do: 12
+  defp parse_rank("K"), do: 13
+  defp parse_rank("A"), do: 14
+
+  defp parse_rank(numeric_face) do
+    {rank, _} = Integer.parse(numeric_face)
+    rank
+  end
+
+  def format_card(card) do
+    {suit, rank} = String.split_at(card, 1)
+    %{suit: suit, rank: parse_rank(rank)}
+  end
+
+  def evaluate_score(cards) do
+    formatted_cards =
+      Enum.map(cards, &format_card/1)
+      |> Enum.sort(&(&1.rank >= &2.rank))
+
+    calculate_score(formatted_cards)
+  end
+
+  defp calculate_score(cards) do
+    [top_score | _] =
+      [
+        # straight_flush?(cards),
+        # four_of_a_kind?(cards),
+        # flush?(cards),
+        # full_house?(cards),
+        # straight?(cards),
+        # three_of_a_kind?(cards),
+        PokerParser.two_pair?(cards),
+        PokerParser.pair?(cards),
+        PokerParser.high_card?(cards)
+      ]
+      |> Enum.reject(&(&1 == nil))
+
+    top_score
+  end
+
+  def extract_ranks(cards) do
+    Enum.map(cards, fn x -> x.rank end)
+  end
+
+  def extract_suits(cards) do
+    Enum.map(cards, fn x -> x.suit end)
   end
 end
