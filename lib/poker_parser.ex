@@ -190,8 +190,8 @@ defmodule PokerParser do
     Enum.at(suits, 0) === Enum.at(suits, 4)
   end
 
-  def flush(kickers) do
-    %{name: :flush, value: 6, tie_breaking_ranks: Enum.reverse(kickers)}
+  def flush(kickers, suit) do
+    %{name: :flush, value: 6, tie_breaking_ranks: Enum.reverse(kickers), suit: suit}
   end
 
   def flush?(cards) do
@@ -201,16 +201,16 @@ defmodule PokerParser do
 
     cond do
       same_suit?(Enum.take(suits, 5)) ->
-        flush(Enum.take(ranks, 5))
+        flush(Enum.take(ranks, 5), Enum.at(Enum.take(suits, 5), 0))
 
       same_suit?(iterative_five(suits, 1)) ->
-        flush(iterative_five(ranks, 1))
+        flush(iterative_five(ranks, 1), Enum.at(iterative_five(suits, 1), 0))
 
       same_suit?(iterative_five(suits, 2)) ->
-        flush(iterative_five(ranks, 2))
+        flush(iterative_five(ranks, 2), Enum.at(iterative_five(suits, 2), 0))
 
       same_suit?(iterative_five(suits, 3)) ->
-        flush(iterative_five(ranks, 3))
+        flush(iterative_five(ranks, 3), Enum.at(iterative_five(suits, 3), 0))
 
       true ->
         nil
@@ -234,6 +234,44 @@ defmodule PokerParser do
       [x, _y1, a, a, a, a, _y2] -> four_of_a_kind(a, x)
       [x, _y1, _y2, a, a, a, a] -> four_of_a_kind(a, x)
       _ -> nil
+    end
+  end
+
+  def straight_flush(primary_rank) do
+    %{
+      name: :straight_flush,
+      value: 9,
+      tie_breaking_ranks: [primary_rank]
+    }
+  end
+
+  def straight_flush?(cards) do
+    result = flush?(cards)
+
+    if result !== nil do
+      filter_unsuited =
+        Enum.filter(cards, fn x -> Map.get(x, :suit) == Map.get(result, :suit) end)
+
+      group_possible_straight_flush =
+        Enum.map(0..(length(filter_unsuited) - 5), fn x ->
+          iterative_five(filter_unsuited, x)
+        end)
+
+      test_arr =
+        Enum.map(group_possible_straight_flush, fn x ->
+          consecutive?(PokerLogic.extract_ranks(x))
+        end)
+
+      index = Enum.find_index(test_arr, fn x -> x == true end)
+
+      if index != nil do
+        straight_flush_group = Enum.at(group_possible_straight_flush, index)
+        straight_flush(Enum.at(Enum.reverse(straight_flush_group), 0).rank)
+      else
+        nil
+      end
+    else
+      nil
     end
   end
 end

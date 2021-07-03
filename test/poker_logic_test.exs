@@ -86,7 +86,19 @@ defmodule PokerLogicTest do
 
   test "four of a kind" do
     score = PokerLogic.evaluate_score(["H4", "HA", "S4", "D4", "C4", "H10", "SQ"])
-    assert score.name == :flush
+    assert score.name == :four_of_a_kind
+    assert Enum.at(score.tie_breaking_ranks, 1) == 14
+  end
+
+  test "royal flush" do
+    score = PokerLogic.evaluate_score(["HA", "HK", "HQ", "HJ", "H10", "H7", "SQ"])
+    assert score.name == :straight_flush
     assert Enum.at(score.tie_breaking_ranks, 0) == 14
+  end
+
+  test "straight flush" do
+    score = PokerLogic.evaluate_score(["HA", "H2", "HQ", "HJ", "H10", "H8", "H9"])
+    assert score.name == :straight_flush
+    assert Enum.at(score.tie_breaking_ranks, 0) == 12
   end
 end

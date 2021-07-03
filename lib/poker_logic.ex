@@ -69,7 +69,7 @@ defmodule PokerLogic do
   defp calculate_score(cards) do
     [top_score | _] =
       [
-        # straight_flush?(cards),
+        PokerParser.straight_flush?(cards),
         PokerParser.four_of_a_kind?(cards),
         PokerParser.flush?(cards),
         PokerParser.full_house?(cards),
