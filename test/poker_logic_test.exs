@@ -38,4 +38,10 @@ defmodule PokerLogicTest do
     IO.inspect(score)
     assert score.name == :two_pair
   end
+
+  test "handles three of kind" do
+    score = PokerLogic.evaluate_score(["H4", "S3", "D2", "SQ", "DQ", "DA", "HQ"])
+    IO.inspect(score)
+    assert score.name == :three_of_a_kind
+  end
 end

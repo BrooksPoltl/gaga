@@ -38,39 +38,60 @@ defmodule PokerParser do
     }
   end
 
-  def handle_three_of_kind(matches, kicker) do
-    ordered_matches = Enum.sort(matches, &(&1 >= &2))
+  # def handle_three_of_kind(matches, kicker) do
+  #   ordered_matches = Enum.sort(matches, &(&1 >= &2))
 
-    kicker_list =
-      [Enum.at(ordered_matches, 2), kicker]
-      |> Enum.sort(&(&1 >= &2))
+  #   kicker_list =
+  #     [Enum.at(ordered_matches, 2), kicker]
+  #     |> Enum.sort(&(&1 >= &2))
 
-    two_pair(Enum.at(ordered_matches, 0), Enum.at(ordered_matches, 1), Enum.at(kicker_list, 0))
-  end
+  #   two_pair(Enum.at(ordered_matches, 0), Enum.at(ordered_matches, 1), Enum.at(kicker_list, 0))
+  # end
 
   ## is this necessary? I think this catches highest pairs first
-  def check_three_of_kind(primary_rank, secondary_rank, kicker) do
-    case kicker do
-      [a, a, k] -> handle_three_of_kind([primary_rank, secondary_rank, a], k)
-      [k, a, a] -> handle_three_of_kind([primary_rank, secondary_rank, a], k)
-      _ -> two_pair(primary_rank, secondary_rank, Enum.at(kicker, 0))
-    end
-  end
+  # def check_three_of_pair(primary_rank, secondary_rank, kicker) do
+  #   case kicker do
+  #     [a, a, k] -> handle_three_of_kind([primary_rank, secondary_rank, a], k)
+  #     [k, a, a] -> handle_three_of_kind([primary_rank, secondary_rank, a], k)
+  #     _ -> two_pair(primary_rank, secondary_rank, Enum.at(kicker, 0))
+  #   end
+  # end
 
   def two_pair?(cards) do
     ranks = PokerLogic.extract_ranks(cards)
 
     case ranks do
-      [a, a, b, b, k1, k2, k3] -> check_three_of_kind(a, b, [k1, k2, k3])
-      [a, a, k1, b, b, k2, k3] -> check_three_of_kind(a, b, [k1, k2, k3])
-      [a, a, k1, k2, b, b, k3] -> check_three_of_kind(a, b, [k1, k2, k3])
-      [a, a, k1, k2, k3, b, b] -> check_three_of_kind(a, b, [k1, k2, k3])
-      [k1, a, a, b, b, k2, k3] -> check_three_of_kind(a, b, [k1, k2, k3])
-      [k1, a, a, k2, b, b, k3] -> check_three_of_kind(a, b, [k1, k2, k3])
-      [k1, a, a, k2, k3, b, b] -> check_three_of_kind(a, b, [k1, k2, k3])
-      [k1, k2, a, a, b, b, k3] -> check_three_of_kind(a, b, [k1, k2, k3])
-      [k1, k2, a, a, k3, b, b] -> check_three_of_kind(a, b, [k1, k2, k3])
-      [k1, k2, k3, a, a, b, b] -> check_three_of_kind(a, b, [k1, k2, k3])
+      [a, a, b, b, k1, _k2, _k3] -> two_pair(a, b, k1)
+      [a, a, k1, b, b, _k2, _k3] -> two_pair(a, b, k1)
+      [a, a, k1, _k2, b, b, _k3] -> two_pair(a, b, k1)
+      [a, a, k1, _k2, _k3, b, b] -> two_pair(a, b, k1)
+      [k1, a, a, b, b, _k2, _k3] -> two_pair(a, b, k1)
+      [k1, a, a, _k2, b, b, _k3] -> two_pair(a, b, k1)
+      [k1, a, a, _k2, _k3, b, b] -> two_pair(a, b, k1)
+      [k1, _k2, a, a, b, b, _k3] -> two_pair(a, b, k1)
+      [k1, _k2, a, a, _k3, b, b] -> two_pair(a, b, k1)
+      [k1, _k2, _k3, a, a, b, b] -> two_pair(a, b, k1)
+      _ -> nil
+    end
+  end
+
+  def three_of_a_kind(primary_rank, kickers) do
+    %{
+      name: :three_of_a_kind,
+      value: 4,
+      tie_breaking_ranks: [primary_rank] ++ kickers
+    }
+  end
+
+  def three_of_a_kind?(cards) do
+    ranks = PokerLogic.extract_ranks(cards)
+
+    case ranks do
+      [a, a, a, k1, k2, _k3, _k4] -> three_of_a_kind(a, [k1, k2])
+      [k1, a, a, a, k2, _k3, _k4] -> three_of_a_kind(a, [k1, k2])
+      [k1, k2, a, a, a, _k3, _k4] -> three_of_a_kind(a, [k1, k2])
+      [k1, k2, _k3, a, a, a, _k4] -> three_of_a_kind(a, [k1, k2])
+      [k1, k2, _k3, _k4, a, a, a] -> three_of_a_kind(a, [k1, k2])
       _ -> nil
     end
   end
