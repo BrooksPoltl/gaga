@@ -60,4 +60,21 @@ defmodule PokerLogicTest do
     assert score.name == :straight
     assert Enum.at(score.tie_breaking_ranks, 0) == 5
   end
+
+  test "handles full house" do
+    score = PokerLogic.evaluate_score(["HA", "S3", "D2", "SQ", "DQ", "DA", "HQ"])
+    assert score.name == :full_house
+  end
+
+  test "picks higher pair with full house" do
+    score = PokerLogic.evaluate_score(["HA", "S3", "D3", "SQ", "DQ", "DA", "HQ"])
+    assert score.name == :full_house
+    assert Enum.at(score.tie_breaking_ranks, 1) == 14
+  end
+
+  test "picks higher three of a kind with full house" do
+    score = PokerLogic.evaluate_score(["HA", "SA", "D3", "SQ", "DQ", "DA", "HQ"])
+    assert score.name == :full_house
+    assert Enum.at(score.tie_breaking_ranks, 0) == 14
+  end
 end

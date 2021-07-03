@@ -72,7 +72,7 @@ defmodule PokerLogic do
         # straight_flush?(cards),
         # four_of_a_kind?(cards),
         # flush?(cards),
-        # full_house?(cards),
+        PokerParser.full_house?(cards),
         PokerParser.straight?(cards),
         PokerParser.three_of_a_kind?(cards),
         PokerParser.two_pair?(cards),

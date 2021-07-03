@@ -157,4 +157,32 @@ defmodule PokerParser do
       end
     end
   end
+
+  def full_house(primary_rank, secondary_rank) do
+    %{
+      name: :full_house,
+      value: 7,
+      tie_breaking_ranks: [primary_rank, secondary_rank]
+    }
+  end
+
+  def full_house?(cards) do
+    ranks = PokerLogic.extract_ranks(cards)
+
+    case ranks do
+      [a, a, a, b, b, _k1, _k2] -> full_house(a, b)
+      [a, a, a, _k1, b, b, _k2] -> full_house(a, b)
+      [a, a, a, _k1, _k2, b, b] -> full_house(a, b)
+      [_k1, a, a, a, b, b, _k2] -> full_house(a, b)
+      [_k1, a, a, a, _k2, b, b] -> full_house(a, b)
+      [b, b, a, a, a, _k1, _k2] -> full_house(a, b)
+      [_k1, _k2, a, a, a, b, b] -> full_house(a, b)
+      [b, b, _k1, a, a, a, _k2] -> full_house(a, b)
+      [_k1, b, b, a, a, a, _k2] -> full_house(a, b)
+      [b, b, _k1, _k2, a, a, a] -> full_house(a, b)
+      [_k1, b, b, _k2, a, a, a] -> full_house(a, b)
+      [_k1, _k2, b, b, a, a, a] -> full_house(a, b)
+      _ -> nil
+    end
+  end
 end
