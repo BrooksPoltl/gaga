@@ -35,13 +35,29 @@ defmodule PokerLogicTest do
 
   test "handles three pair" do
     score = PokerLogic.evaluate_score(["H3", "S3", "DA", "SQ", "DQ", "DA", "H4"])
-    IO.inspect(score)
     assert score.name == :two_pair
   end
 
   test "handles three of kind" do
     score = PokerLogic.evaluate_score(["H4", "S3", "D2", "SQ", "DQ", "DA", "HQ"])
-    IO.inspect(score)
     assert score.name == :three_of_a_kind
+  end
+
+  test "handles straight" do
+    score = PokerLogic.evaluate_score(["H4", "S3", "D2", "S6", "D7", "D5", "H9"])
+    assert score.name == :straight
+    assert Enum.at(score.tie_breaking_ranks, 0) == 7
+  end
+
+  test "handles straight ace high" do
+    score = PokerLogic.evaluate_score(["H4", "S3", "D10", "SJ", "DK", "DA", "HQ"])
+    assert score.name == :straight
+    assert Enum.at(score.tie_breaking_ranks, 0) == 14
+  end
+
+  test "handles straight ace low five high" do
+    score = PokerLogic.evaluate_score(["H4", "S3", "D2", "S5", "DQ", "DA", "HQ"])
+    assert score.name == :straight
+    assert Enum.at(score.tie_breaking_ranks, 0) == 5
   end
 end

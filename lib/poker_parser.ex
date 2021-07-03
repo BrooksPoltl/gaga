@@ -1,4 +1,10 @@
 defmodule PokerParser do
+  defp consecutive?([_a]), do: true
+
+  defp consecutive?([a | [b | t]]) do
+    a + 1 == b and consecutive?([b | t])
+  end
+
   def high_card(kickers) do
     %{name: :high_card, value: 1, tie_breaking_ranks: kickers}
   end
@@ -93,6 +99,62 @@ defmodule PokerParser do
       [k1, k2, _k3, a, a, a, _k4] -> three_of_a_kind(a, [k1, k2])
       [k1, k2, _k3, _k4, a, a, a] -> three_of_a_kind(a, [k1, k2])
       _ -> nil
+    end
+  end
+
+  defp iterative_five(ranks, i) do
+    Enum.reverse(Enum.take(Enum.drop(ranks, i), 5))
+  end
+
+  def straight(primary_rank) do
+    %{
+      name: :straight,
+      value: 5,
+      tie_breaking_ranks: [primary_rank]
+    }
+  end
+
+  def straight?(cards) do
+    ranks = PokerLogic.extract_ranks(cards)
+
+    if Enum.at(ranks, 0) == 14 do
+      mod_ranks = ranks ++ [1]
+
+      cond do
+        consecutive?(Enum.reverse(Enum.take(mod_ranks, 5))) ->
+          straight(Enum.at(mod_ranks, 0))
+
+        consecutive?(iterative_five(mod_ranks, 1)) ->
+          straight(Enum.at(iterative_five(mod_ranks, 1), 4))
+
+        consecutive?(iterative_five(mod_ranks, 2)) ->
+          straight(Enum.at(iterative_five(mod_ranks, 2), 4))
+
+        consecutive?(iterative_five(mod_ranks, 3)) ->
+          straight(Enum.at(iterative_five(mod_ranks, 3), 4))
+
+        true ->
+          nil
+      end
+    else
+      mod_ranks = ranks ++ [0]
+
+      cond do
+        consecutive?(Enum.reverse(Enum.take(mod_ranks, 5))) ->
+          straight(Enum.at(mod_ranks, 0))
+
+        consecutive?(iterative_five(mod_ranks, 1)) ->
+          straight(Enum.at(iterative_five(mod_ranks, 1), 4))
+
+        consecutive?(iterative_five(mod_ranks, 2)) ->
+          straight(Enum.at(iterative_five(mod_ranks, 2), 4))
+
+        consecutive?(iterative_five(mod_ranks, 3)) ->
+          straight(Enum.at(iterative_five(mod_ranks, 3), 4))
+
+        true ->
+          nil
+      end
     end
   end
 end
