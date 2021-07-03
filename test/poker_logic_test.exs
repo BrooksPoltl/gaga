@@ -77,4 +77,16 @@ defmodule PokerLogicTest do
     assert score.name == :full_house
     assert Enum.at(score.tie_breaking_ranks, 0) == 14
   end
+
+  test "flush with right kickers" do
+    score = PokerLogic.evaluate_score(["H4", "HA", "H3", "HQ", "H7", "H10", "SQ"])
+    assert score.name == :flush
+    assert Enum.at(score.tie_breaking_ranks, 0) == 14
+  end
+
+  test "four of a kind" do
+    score = PokerLogic.evaluate_score(["H4", "HA", "S4", "D4", "C4", "H10", "SQ"])
+    assert score.name == :flush
+    assert Enum.at(score.tie_breaking_ranks, 0) == 14
+  end
 end

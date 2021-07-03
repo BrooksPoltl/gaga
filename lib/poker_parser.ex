@@ -5,6 +5,10 @@ defmodule PokerParser do
     a + 1 == b and consecutive?([b | t])
   end
 
+  defp iterative_five(ranks, i) do
+    Enum.reverse(Enum.take(Enum.drop(ranks, i), 5))
+  end
+
   def high_card(kickers) do
     %{name: :high_card, value: 1, tie_breaking_ranks: kickers}
   end
@@ -102,10 +106,6 @@ defmodule PokerParser do
     end
   end
 
-  defp iterative_five(ranks, i) do
-    Enum.reverse(Enum.take(Enum.drop(ranks, i), 5))
-  end
-
   def straight(primary_rank) do
     %{
       name: :straight,
@@ -182,6 +182,57 @@ defmodule PokerParser do
       [b, b, _k1, _k2, a, a, a] -> full_house(a, b)
       [_k1, b, b, _k2, a, a, a] -> full_house(a, b)
       [_k1, _k2, b, b, a, a, a] -> full_house(a, b)
+      _ -> nil
+    end
+  end
+
+  def same_suit?(suits) do
+    Enum.at(suits, 0) === Enum.at(suits, 4)
+  end
+
+  def flush(kickers) do
+    %{name: :flush, value: 6, tie_breaking_ranks: Enum.reverse(kickers)}
+  end
+
+  def flush?(cards) do
+    sorted_suits = Enum.sort(cards, &(&1.suit >= &2.suit))
+    ranks = PokerLogic.extract_ranks(sorted_suits)
+    suits = PokerLogic.extract_suits(sorted_suits)
+
+    cond do
+      same_suit?(Enum.take(suits, 5)) ->
+        flush(Enum.take(ranks, 5))
+
+      same_suit?(iterative_five(suits, 1)) ->
+        flush(iterative_five(ranks, 1))
+
+      same_suit?(iterative_five(suits, 2)) ->
+        flush(iterative_five(ranks, 2))
+
+      same_suit?(iterative_five(suits, 3)) ->
+        flush(iterative_five(ranks, 3))
+
+      true ->
+        nil
+    end
+  end
+
+  def four_of_a_kind(primary_rank, secondary_rank) do
+    %{
+      name: :four_of_a_kind,
+      value: 8,
+      tie_breaking_ranks: [primary_rank, secondary_rank]
+    }
+  end
+
+  def four_of_a_kind?(cards) do
+    ranks = PokerLogic.extract_ranks(cards)
+
+    case ranks do
+      [a, a, a, a, x, _y1, _y2] -> four_of_a_kind(a, x)
+      [x, a, a, a, a, _y1, _y2] -> four_of_a_kind(a, x)
+      [x, _y1, a, a, a, a, _y2] -> four_of_a_kind(a, x)
+      [x, _y1, _y2, a, a, a, a] -> four_of_a_kind(a, x)
       _ -> nil
     end
   end
