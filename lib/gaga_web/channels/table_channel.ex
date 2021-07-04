@@ -15,7 +15,7 @@ defmodule GagaWeb.TableChannel do
   def handle_in("get_table", body, socket) do
     room_id = socket.assigns.room_id
     table_users = Poker.get_users_at_table(room_id)
-    # TODO: probably need a way to check if the game is in progress
+
     cond do
       length(table_users) == 2 ->
         game_id = start_game(table_users, room_id)
@@ -220,26 +220,48 @@ defmodule GagaWeb.TableChannel do
   def handle_out("new_event", msg, socket) do
     hands = blur_other_hands(msg.turn.hands, socket.assigns.user_id)
     # TODO: this should probably happen higher rather than for every person
+    # should happen for fold and call,  cant end on a raise
     is_end_of_round? = Poker.get_round_and_check_if_end(msg.game_id)
 
     if is_end_of_round? do
-      game = Poker.increment_round_and_get_game(msg.game_id)
+      round = Poker.get_round_by_game_id(msg.game_id)
+      game = Poker.get_game_by_id(msg.game_id)
 
-      new_hands =
-        hands
-        |> Enum.map(fn x -> Map.replace(x, :amount_bet_this_round, 0) end)
+      # game is over evaluate hands
+      if round == 3 do
+        hands = Poker.get_hands_by_game_id(msg.game_id)
+        IO.inspect(Poker.end_game(game, hands))
 
-      push(
-        socket,
-        "new_event",
-        %{
-          type: msg.type,
-          amt: msg.amt,
-          user_id: msg.user_id,
-          game: game,
-          turn: %{user_id: msg.turn.user_id, hands: new_hands}
-        }
-      )
+        push(
+          socket,
+          "new_event",
+          %{
+            type: msg.type,
+            amt: msg.amt,
+            user_id: msg.user_id,
+            game: game,
+            turn: %{user_id: msg.turn.user_id, hands: hands}
+          }
+        )
+      else
+        game = Poker.increment_round_and_get_game(msg.game_id)
+
+        new_hands =
+          hands
+          |> Enum.map(fn x -> Map.replace(x, :amount_bet_this_round, 0) end)
+
+        push(
+          socket,
+          "new_event",
+          %{
+            type: msg.type,
+            amt: msg.amt,
+            user_id: msg.user_id,
+            game: game,
+            turn: %{user_id: msg.turn.user_id, hands: new_hands}
+          }
+        )
+      end
     else
       push(
         socket,

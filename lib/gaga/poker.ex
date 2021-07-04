@@ -396,6 +396,29 @@ defmodule Gaga.Poker do
     |> Map.put(:card5, set_value_if_true(game.card5, game.shown_river))
   end
 
+  def end_game(game, hands) do
+    active_hands = Enum.filter(hands, fn x -> x.is_active == true end)
+
+    scores =
+      Enum.map(active_hands, fn x ->
+        PokerLogic.evaluate_score([
+          game.card1,
+          game.card2,
+          game.card3,
+          game.card4,
+          game.card5,
+          x.card1,
+          x.card2
+        ])
+      end)
+
+    attach_scores =
+      Enum.map(0..(length(active_hands) - 1), fn x ->
+        IO.inspect(x)
+        Map.merge(Enum.at(active_hands, x), Enum.at(scores, x))
+      end)
+  end
+
   def get_game_by_id(game_id) do
     sub_query =
       from(e in "events",

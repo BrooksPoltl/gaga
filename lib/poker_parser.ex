@@ -48,25 +48,6 @@ defmodule PokerParser do
     }
   end
 
-  # def handle_three_of_kind(matches, kicker) do
-  #   ordered_matches = Enum.sort(matches, &(&1 >= &2))
-
-  #   kicker_list =
-  #     [Enum.at(ordered_matches, 2), kicker]
-  #     |> Enum.sort(&(&1 >= &2))
-
-  #   two_pair(Enum.at(ordered_matches, 0), Enum.at(ordered_matches, 1), Enum.at(kicker_list, 0))
-  # end
-
-  ## is this necessary? I think this catches highest pairs first
-  # def check_three_of_pair(primary_rank, secondary_rank, kicker) do
-  #   case kicker do
-  #     [a, a, k] -> handle_three_of_kind([primary_rank, secondary_rank, a], k)
-  #     [k, a, a] -> handle_three_of_kind([primary_rank, secondary_rank, a], k)
-  #     _ -> two_pair(primary_rank, secondary_rank, Enum.at(kicker, 0))
-  #   end
-  # end
-
   def two_pair?(cards) do
     ranks = PokerLogic.extract_ranks(cards)
 
