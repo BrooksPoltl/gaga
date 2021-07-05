@@ -171,7 +171,6 @@ defmodule GagaWeb.TableChannel do
 
         Map.get(body, "event") ==
             "raise" ->
-          IO.inspect(body)
           amount_to_call = Poker.calculate_amount_to_call(socket.assigns.user_id, game_id)
           # TODO: add validation to make sure its a valid raise and they are capable
           raise_amount = amount_to_call + Map.get(body, "amt")
@@ -230,7 +229,8 @@ defmodule GagaWeb.TableChannel do
       # game is over evaluate hands
       if round == 3 do
         hands = Poker.get_hands_by_game_id(msg.game_id)
-        IO.inspect(Poker.end_game(game, hands))
+        # Need to validate and check side games and determine winners
+        IO.inspect(Poker.determine_winners(game, hands))
 
         push(
           socket,

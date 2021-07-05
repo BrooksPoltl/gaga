@@ -10,7 +10,7 @@ defmodule PokerParser do
   end
 
   def high_card(kickers) do
-    %{name: :high_card, value: 1, tie_breaking_ranks: kickers}
+    %{name: :high_card, value: 1, tie_breaking_ranks: Enum.take(kickers, 5)}
   end
 
   def high_card?(cards) do
