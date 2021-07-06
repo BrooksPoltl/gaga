@@ -230,7 +230,13 @@ defmodule GagaWeb.TableChannel do
       if round == 3 do
         hands = Poker.get_hands_by_game_id(msg.game_id)
         # Need to validate and check side games and determine winners
-        IO.inspect(Poker.determine_winners(game, hands))
+        winner = Poker.determine_winners(game, hands)
+
+        total = Poker.get_pot_size(msg.game_id) / length(winner)
+
+        Enum.each(winner, fn x ->
+          Poker.give_user_money(x.user_id, round(total))
+        end)
 
         push(
           socket,
@@ -243,6 +249,24 @@ defmodule GagaWeb.TableChannel do
             turn: %{user_id: msg.turn.user_id, hands: hands}
           }
         )
+
+        # send message telling who won and how maybe add the kicker that won it if its a tie?
+        room_id = socket.assigns.room_id
+        users = Poker.get_users_at_table(room_id)
+
+        new_game_id = start_game(users, room_id, false, msg.game_id)
+
+        new_game = Poker.get_game_by_id(new_game_id)
+        new_hands = Poker.get_hands_by_game_id(new_game_id)
+        user_id = Poker.find_active_user_by_game_id(new_game_id)
+
+        Process.sleep(8000)
+
+        broadcast(socket, "new_game", %{
+          game: new_game,
+          hands: new_hands,
+          user_id: user_id
+        })
       else
         game = Poker.increment_round_and_get_game(msg.game_id)
 
