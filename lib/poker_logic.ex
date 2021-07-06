@@ -91,4 +91,38 @@ defmodule PokerLogic do
   def extract_suits(cards) do
     Enum.map(cards, fn x -> x.suit end)
   end
+
+  def is_everyone_all_in?(hands) do
+    # IF there is only 1 person not all in that means there is no one left to play
+    able_to_play =
+      Enum.filter(hands, fn x ->
+        x.cash != 0
+      end)
+
+    length(able_to_play) < 2
+  end
+
+  def blur_other_hands(hands, user_id) do
+    Enum.map(hands, fn h ->
+      if h.user_id == user_id do
+        h
+      else
+        h
+        |> Map.put(:card1, nil)
+        |> Map.put(:card2, nil)
+      end
+    end)
+  end
+
+  def blur_inactive_hands(hands) do
+    Enum.map(hands, fn h ->
+      if h.is_active do
+        h
+      else
+        h
+        |> Map.put(:card1, nil)
+        |> Map.put(:card2, nil)
+      end
+    end)
+  end
 end

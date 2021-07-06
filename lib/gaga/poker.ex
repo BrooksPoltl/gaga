@@ -146,7 +146,7 @@ defmodule Gaga.Poker do
         |> Repo.update()
 
       true ->
-        IO.puts("GAME_OVER")
+        nil
     end
 
     get_game_by_id(game_id)
@@ -450,25 +450,29 @@ defmodule Gaga.Poker do
   def determine_winners(game, hands) do
     active_hands = Enum.filter(hands, fn x -> x.is_active == true end)
 
-    scores =
-      Enum.map(active_hands, fn x ->
-        PokerLogic.evaluate_score([
-          game.card1,
-          game.card2,
-          game.card3,
-          game.card4,
-          game.card5,
-          x.card1,
-          x.card2
-        ])
-      end)
+    if length(active_hands) == 1 do
+      active_hands
+    else
+      scores =
+        Enum.map(active_hands, fn x ->
+          PokerLogic.evaluate_score([
+            game.card1,
+            game.card2,
+            game.card3,
+            game.card4,
+            game.card5,
+            x.card1,
+            x.card2
+          ])
+        end)
 
-    attach_scores =
-      Enum.map(0..(length(active_hands) - 1), fn x ->
-        Map.merge(Enum.at(active_hands, x), Enum.at(scores, x))
-      end)
+      attach_scores =
+        Enum.map(0..(length(active_hands) - 1), fn x ->
+          Map.merge(Enum.at(active_hands, x), Enum.at(scores, x))
+        end)
 
-    evaluate_results(attach_scores)
+      evaluate_results(attach_scores)
+    end
   end
 
   def get_game_by_id(game_id) do

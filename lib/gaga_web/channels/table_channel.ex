@@ -3,7 +3,7 @@ defmodule GagaWeb.TableChannel do
   alias Gaga.Poker
   alias Gaga.Repo
 
-  intercept ["get_table", "new_event", "new_turn", "new_game"]
+  intercept ["get_table", "new_turn", "new_game", "new_event"]
 
   def join("tables:" <> room_id, _params, socket) do
     user_id = socket.assigns.user_id
@@ -18,7 +18,7 @@ defmodule GagaWeb.TableChannel do
 
     cond do
       length(table_users) == 2 ->
-        game_id = start_game(table_users, room_id)
+        game_id = Helpers.Game.start_game(table_users, room_id)
         game = Poker.get_game_by_room_id(room_id)
         hands = Poker.get_hands_by_game_id(game_id)
 
@@ -38,18 +38,6 @@ defmodule GagaWeb.TableChannel do
     end
 
     {:reply, {:ok, []}, socket}
-  end
-
-  def blur_other_hands(hands, user_id) do
-    Enum.map(hands, fn h ->
-      if h.user_id == user_id do
-        h
-      else
-        h
-        |> Map.put(:card1, nil)
-        |> Map.put(:card2, nil)
-      end
-    end)
   end
 
   def handle_out("get_table", msg, socket) do
@@ -89,7 +77,8 @@ defmodule GagaWeb.TableChannel do
   end
 
   def handle_out("new_game", msg, socket) do
-    hands = blur_other_hands(msg.hands, socket.assigns.user_id)
+    Process.sleep(5000)
+    hands = PokerLogic.blur_other_hands(msg.hands, socket.assigns.user_id)
 
     push(
       socket,
@@ -110,92 +99,16 @@ defmodule GagaWeb.TableChannel do
       cond do
         Map.get(body, "event") ==
             "call" ->
-          amount_to_call = Poker.calculate_amount_to_call(socket.assigns.user_id, game_id)
-
-          event = %{
-            type: "call",
-            user_id: socket.assigns.user_id,
-            game_id: game_id,
-            amount: amount_to_call,
-            inserted_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second),
-            updated_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
-          }
-
-          Poker.create_event(event)
-          next_user_id = Poker.find_active_user_by_game_id(game_id)
-
-          hands = Poker.get_hands_by_game_id(game_id)
-
-          broadcast!(socket, "new_event", %{
-            type: "call",
-            amt: amount_to_call,
-            game_id: game_id,
-            user_id: socket.assigns.user_id,
-            turn: %{user_id: next_user_id, hands: hands}
-          })
+          call(socket, game_id)
 
         Map.get(body, "event") ==
             "fold" ->
-          event = %{
-            type: "fold",
-            user_id: socket.assigns.user_id,
-            game_id: game_id,
-            amount: 0,
-            inserted_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second),
-            updated_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
-          }
-
-          is_game_over? = Poker.create_event(event)
-
-          if is_game_over? do
-            room_id = socket.assigns.room_id
-            users = Poker.get_users_at_table(room_id)
-            game_id = start_game(users, room_id, false, game_id)
-            game = Poker.get_game_by_room_id(socket.assigns.room_id)
-            hands = Poker.get_hands_by_game_id(game_id)
-            user_id = Poker.find_active_user_by_game_id(game_id)
-            broadcast!(socket, "new_game", %{game: game, hands: hands, user_id: user_id})
-          else
-            next_user_id = Poker.find_active_user_by_game_id(game_id)
-
-            hands = Poker.get_hands_by_game_id(game_id)
-
-            broadcast!(socket, "new_event", %{
-              type: "fold",
-              amt: 0,
-              game_id: game_id,
-              user_id: socket.assigns.user_id,
-              turn: %{user_id: next_user_id, hands: hands}
-            })
-          end
+          fold(socket, game_id)
 
         Map.get(body, "event") ==
             "raise" ->
-          amount_to_call = Poker.calculate_amount_to_call(socket.assigns.user_id, game_id)
-          # TODO: add validation to make sure its a valid raise and they are capable
-          raise_amount = amount_to_call + Map.get(body, "amt")
-
-          event = %{
-            type: "raise",
-            user_id: socket.assigns.user_id,
-            game_id: game_id,
-            amount: raise_amount,
-            inserted_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second),
-            updated_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
-          }
-
-          Poker.create_event(event)
-          next_user_id = Poker.find_active_user_by_game_id(game_id)
-
-          hands = Poker.get_hands_by_game_id(game_id)
-
-          broadcast!(socket, "new_event", %{
-            type: "raise",
-            amt: Map.get(body, "amt"),
-            game_id: game_id,
-            user_id: socket.assigns.user_id,
-            turn: %{user_id: next_user_id, hands: hands}
-          })
+          make_raise(socket, game_id, Map.get(body, "amt"))
+          nil
       end
 
       # Send event request to the next person
@@ -204,8 +117,88 @@ defmodule GagaWeb.TableChannel do
     {:reply, {:ok, []}, socket}
   end
 
+  def handle_out("new_event", msg, socket) do
+    if msg.game_over? do
+      new_msg =
+        msg
+        |> Map.put(:turn, %{
+          user_id: msg.turn.user_id,
+          hands: PokerLogic.blur_inactive_hands(msg.turn.hands)
+        })
+
+      push(
+        socket,
+        "new_event",
+        new_msg
+      )
+    else
+      new_msg =
+        msg
+        |> Map.put(:turn, %{
+          user_id: msg.turn.user_id,
+          hands: PokerLogic.blur_other_hands(msg.turn.hands, socket.assigns.user_id)
+        })
+
+      push(
+        socket,
+        "new_event",
+        new_msg
+      )
+    end
+
+    {:noreply, socket}
+  end
+
+  def fold(socket, game_id) do
+    msg = Helpers.Event.handle_fold(socket.assigns.user_id, game_id, socket.assigns.room_id)
+
+    if msg.game_msg != nil do
+      active_hands? = length(Enum.filter(msg.fold_msg.turn.hands, fn x -> x.is_active end)) > 1
+
+      fold_msg =
+        msg.fold_msg
+        |> Map.put(:game_over?, active_hands?)
+
+      broadcast(socket, "new_event", fold_msg)
+      broadcast(socket, "new_game", msg.game_msg)
+    else
+      fold_msg =
+        msg.fold_msg
+        |> Map.put(:game_over?, false)
+
+      broadcast(socket, "new_event", fold_msg)
+    end
+  end
+
+  def call(socket, game_id) do
+    msg = Helpers.Event.handle_call(socket.assigns.user_id, game_id, socket.assigns.room_id)
+
+    if msg.game_msg != nil do
+      call_msg =
+        msg.call_msg
+        |> Map.put(:game_over?, true)
+
+      broadcast(socket, "new_event", call_msg)
+      broadcast(socket, "new_game", msg.game_msg)
+    else
+      call_msg =
+        msg.call_msg
+        |> Map.put(:game_over?, false)
+
+      broadcast(socket, "new_event", call_msg)
+    end
+  end
+
+  def make_raise(socket, game_id, amt) do
+    raise_msg =
+      Helpers.Event.handle_raise(socket.assigns.user_id, game_id, amt)
+      |> Map.put(:game_over?, false)
+
+    broadcast!(socket, "new_event", raise_msg)
+  end
+
   def handle_out("new_turn", msg, socket) do
-    hands = blur_other_hands(msg.hands, socket.assigns.user_id)
+    hands = PokerLogic.blur_other_hands(msg.hands, socket.assigns.user_id)
 
     push(
       socket,
@@ -216,128 +209,7 @@ defmodule GagaWeb.TableChannel do
     {:noreply, socket}
   end
 
-  def handle_out("new_event", msg, socket) do
-    hands = blur_other_hands(msg.turn.hands, socket.assigns.user_id)
-    # TODO: this should probably happen higher rather than for every person
-    # should happen for fold and call,  cant end on a raise
-    is_end_of_round? = Poker.get_round_and_check_if_end(msg.game_id)
-
-    if is_end_of_round? do
-      round = Poker.get_round_by_game_id(msg.game_id)
-      game = Poker.get_game_by_id(msg.game_id)
-
-      # game is over evaluate hands
-      if round == 3 do
-        hands = Poker.get_hands_by_game_id(msg.game_id)
-        # Need to validate and check side games and determine winners
-        winner = Poker.determine_winners(game, hands)
-
-        total = Poker.get_pot_size(msg.game_id) / length(winner)
-
-        Enum.each(winner, fn x ->
-          Poker.give_user_money(x.user_id, round(total))
-        end)
-
-        push(
-          socket,
-          "new_event",
-          %{
-            type: msg.type,
-            amt: msg.amt,
-            user_id: msg.user_id,
-            game: game,
-            turn: %{user_id: msg.turn.user_id, hands: hands}
-          }
-        )
-
-        # send message telling who won and how maybe add the kicker that won it if its a tie?
-        room_id = socket.assigns.room_id
-        users = Poker.get_users_at_table(room_id)
-
-        new_game_id = start_game(users, room_id, false, msg.game_id)
-
-        new_game = Poker.get_game_by_id(new_game_id)
-        new_hands = Poker.get_hands_by_game_id(new_game_id)
-        user_id = Poker.find_active_user_by_game_id(new_game_id)
-
-        Process.sleep(8000)
-
-        broadcast(socket, "new_game", %{
-          game: new_game,
-          hands: new_hands,
-          user_id: user_id
-        })
-      else
-        game = Poker.increment_round_and_get_game(msg.game_id)
-
-        new_hands =
-          hands
-          |> Enum.map(fn x -> Map.replace(x, :amount_bet_this_round, 0) end)
-
-        push(
-          socket,
-          "new_event",
-          %{
-            type: msg.type,
-            amt: msg.amt,
-            user_id: msg.user_id,
-            game: game,
-            turn: %{user_id: msg.turn.user_id, hands: new_hands}
-          }
-        )
-      end
-    else
-      push(
-        socket,
-        "new_event",
-        %{
-          type: msg.type,
-          amt: msg.amt,
-          user_id: msg.user_id,
-          turn: %{user_id: msg.turn.user_id, hands: hands}
-        }
-      )
-    end
-
-    {:noreply, socket}
-  end
-
-  def create_game(table, room_id, big_user_id, small_user_id) do
-    {new_table, flop} = PokerLogic.create_game(table)
-    {:ok, game} = Poker.create_game(flop, room_id, big_user_id, small_user_id)
-
-    formatted_hands =
-      Enum.map(new_table, fn x ->
-        %{
-          card1: Enum.at(x.hand, 0),
-          card2: Enum.at(x.hand, 1),
-          user_id: x.user_id,
-          game_id: game.id,
-          is_active: true,
-          inserted_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second),
-          updated_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
-        }
-      end)
-
-    Poker.create_hands(formatted_hands)
-    game.id
-  end
-
-  # If game already in progress wait
-  def start_game(table, room_id, first_game \\ true, prev_game_id \\ 0) do
-    if first_game do
-      big_user = Enum.at(table, 0)
-      small_user = Enum.at(table, 1)
-      game_id = create_game(table, room_id, big_user.user_id, small_user.user_id)
-      game_id
-    else
-      # logic to determine big/small blinds
-      # big and small blind might leave table.
-      next_blinds = Poker.get_next_blind_user_ids(table, prev_game_id)
-      # if they do we need to still get their created dates to use their dates
-      game_id = create_game(table, room_id, next_blinds.big_user_id, next_blinds.small_user_id)
-      game_id
-    end
+  def handle_all_in() do
   end
 
   def leave(room_id, user_id) do
