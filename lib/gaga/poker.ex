@@ -17,7 +17,7 @@ defmodule Gaga.Poker do
           cash: u.cash,
           inserted_at: u.inserted_at
         },
-        where: room_user.room_id == ^room_id,
+        where: room_user.room_id == ^room_id and u.cash > 0,
         order_by: [asc: u.inserted_at]
       )
 
@@ -53,8 +53,13 @@ defmodule Gaga.Poker do
   def bet_amount(user_id, amt) do
     user = Repo.get_by(User, id: user_id)
 
-    change(user, %{cash: user.cash - amt})
-    |> Repo.update()
+    if user.cash > amt do
+      change(user, %{cash: user.cash - amt})
+      |> Repo.update()
+    else
+      change(user, %{cash: 0})
+      |> Repo.update()
+    end
   end
 
   def give_user_money(user_id, money) do
@@ -193,7 +198,9 @@ defmodule Gaga.Poker do
 
     query2 =
       from(h in "hands",
-        where: h.game_id == ^game_id and h.is_active == true,
+        join: u in Users,
+        on: [id: h.user_id],
+        where: h.game_id == ^game_id and h.is_active == true and u.cash != 0,
         select: %{user_id: h.user_id}
       )
 
@@ -591,7 +598,7 @@ defmodule Gaga.Poker do
         |> Enum.concat()
 
       get_rid_of_first = Enum.slice(concat_user, 1, length(concat_user))
-      Enum.find(Enum.reverse(get_rid_of_first), fn x -> x.is_active end).user_id
+      Enum.find(Enum.reverse(get_rid_of_first), fn x -> x.is_active and x.cash != 0 end).user_id
     end
   end
 

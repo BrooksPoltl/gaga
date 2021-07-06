@@ -67,48 +67,66 @@ defmodule Helpers.Event do
     }
 
     Poker.create_event(event)
-    next_user_id = Poker.find_active_user_by_game_id(game_id)
     hands = Poker.get_hands_by_game_id(game_id)
-    game = Poker.get_game_by_id(game_id)
 
-    call_msg = %{
-      type: "call",
-      amt: amount_to_call,
-      game: game,
-      user_id: user_id,
-      turn: %{user_id: next_user_id, hands: hands}
-    }
+    is_all_in? = PokerLogic.is_everyone_all_in?(hands)
+    IO.inspect(hands)
 
-    is_end_of_round? = Poker.get_round_and_check_if_end(game_id)
-    round = Poker.get_round_by_game_id(game_id)
-    is_game_over? = is_end_of_round? and round == 3
+    if is_all_in? do
+      IO.puts("WE ALL IN BABY")
+      game = Poker.get_game_by_id(game_id)
 
-    if is_game_over? do
-      new_msg =
-        call_msg
-        |> Map.put(:turn, %{user_id: 0, hands: call_msg.turn.hands})
-
-      new_game_msg = Helpers.Game.start_and_send_game(room_id, game_id)
-
-      %{call_msg: new_msg, game_msg: new_game_msg}
+      %{
+        type: "all-in",
+        amt: amount_to_call,
+        game: game,
+        user_id: user_id,
+        turn: %{user_id: 0, hands: hands}
+      }
     else
-      if is_end_of_round? do
-        msg = Helpers.Game.handle_rounds_return_game_hands(call_msg.turn.hands, game_id)
+      next_user_id = Poker.find_active_user_by_game_id(game_id)
 
-        new_call_msg =
-          Map.put(call_msg, :game, msg.game)
-          |> Map.put(:turn, %{hands: msg.hands, user_id: call_msg.turn.user_id})
+      game = Poker.get_game_by_id(game_id)
 
-        %{call_msg: new_call_msg, game_msg: nil}
+      call_msg = %{
+        type: "call",
+        amt: amount_to_call,
+        game: game,
+        user_id: user_id,
+        turn: %{user_id: next_user_id, hands: hands}
+      }
+
+      is_end_of_round? = Poker.get_round_and_check_if_end(game_id)
+      round = Poker.get_round_by_game_id(game_id)
+      is_game_over? = is_end_of_round? and round == 3
+
+      if is_game_over? do
+        new_msg =
+          call_msg
+          |> Map.put(:turn, %{user_id: 0, hands: call_msg.turn.hands})
+
+        Helpers.Game.end_game(game_id)
+        new_game_msg = Helpers.Game.start_and_send_game(room_id, game_id)
+
+        %{call_msg: new_msg, game_msg: new_game_msg}
       else
-        %{call_msg: call_msg, game_msg: nil}
+        if is_end_of_round? do
+          msg = Helpers.Game.handle_rounds_return_game_hands(call_msg.turn.hands, game_id)
+
+          new_call_msg =
+            Map.put(call_msg, :game, msg.game)
+            |> Map.put(:turn, %{hands: msg.hands, user_id: call_msg.turn.user_id})
+
+          %{call_msg: new_call_msg, game_msg: nil}
+        else
+          %{call_msg: call_msg, game_msg: nil}
+        end
       end
     end
   end
 
   def handle_raise(user_id, game_id, amt) do
     amount_to_call = Poker.calculate_amount_to_call(user_id, game_id)
-    # TODO: add validation to make sure its a valid raise and they are capable
     raise_amount = amount_to_call + amt
 
     event = %{

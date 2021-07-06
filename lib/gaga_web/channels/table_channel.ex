@@ -15,6 +15,7 @@ defmodule GagaWeb.TableChannel do
   def handle_in("get_table", body, socket) do
     room_id = socket.assigns.room_id
     table_users = Poker.get_users_at_table(room_id)
+    IO.inspect(table_users)
 
     cond do
       length(table_users) == 2 ->
@@ -28,7 +29,7 @@ defmodule GagaWeb.TableChannel do
           new_game: true
         })
 
-      length(table_users) == 1 ->
+      length(table_users) <= 1 ->
         nil
 
       true ->
@@ -118,7 +119,11 @@ defmodule GagaWeb.TableChannel do
   end
 
   def handle_out("new_event", msg, socket) do
-    if msg.game_over? do
+    IO.inspect("CREATING A NEW EVENT")
+
+    if msg.type == "all-in" do
+      # show all active cards
+
       new_msg =
         msg
         |> Map.put(:turn, %{
@@ -126,27 +131,61 @@ defmodule GagaWeb.TableChannel do
           hands: PokerLogic.blur_inactive_hands(msg.turn.hands)
         })
 
-      push(
-        socket,
-        "new_event",
-        new_msg
-      )
+      allin(socket, new_msg)
     else
-      new_msg =
-        msg
-        |> Map.put(:turn, %{
-          user_id: msg.turn.user_id,
-          hands: PokerLogic.blur_other_hands(msg.turn.hands, socket.assigns.user_id)
-        })
+      if msg.game_over? do
+        new_msg =
+          msg
+          |> Map.put(:turn, %{
+            user_id: msg.turn.user_id,
+            hands: PokerLogic.blur_inactive_hands(msg.turn.hands)
+          })
 
-      push(
-        socket,
-        "new_event",
-        new_msg
-      )
+        push(
+          socket,
+          "new_event",
+          new_msg
+        )
+      else
+        new_msg =
+          msg
+          |> Map.put(:turn, %{
+            user_id: msg.turn.user_id,
+            hands: PokerLogic.blur_other_hands(msg.turn.hands, socket.assigns.user_id)
+          })
+
+        push(
+          socket,
+          "new_event",
+          new_msg
+        )
+      end
     end
 
     {:noreply, socket}
+  end
+
+  def allin(socket, msg) do
+    # turn remaining cards
+    round = Poker.get_round_by_game_id(msg.game.id)
+
+    if round == 3 do
+      # end game
+      Helpers.Game.end_game(msg.game.id)
+      new_game_msg = Helpers.Game.start_and_send_game(socket.assigns.room_id, msg.game.id)
+      push(socket, "new_game", new_game_msg)
+    else
+      # turn next card
+      game = Poker.increment_round_and_get_game(msg.game.id)
+
+      new_msg =
+        msg
+        |> Map.put(:game, game)
+
+      Process.sleep(2000)
+      push(socket, "new_event", new_msg)
+      allin(socket, new_msg)
+    end
   end
 
   def fold(socket, game_id) do
@@ -173,19 +212,23 @@ defmodule GagaWeb.TableChannel do
   def call(socket, game_id) do
     msg = Helpers.Event.handle_call(socket.assigns.user_id, game_id, socket.assigns.room_id)
 
-    if msg.game_msg != nil do
-      call_msg =
-        msg.call_msg
-        |> Map.put(:game_over?, true)
-
-      broadcast(socket, "new_event", call_msg)
-      broadcast(socket, "new_game", msg.game_msg)
+    if msg.type == "all-in" do
+      broadcast(socket, "new_event", msg)
     else
-      call_msg =
-        msg.call_msg
-        |> Map.put(:game_over?, false)
+      if msg.game_msg != nil do
+        call_msg =
+          msg.call_msg
+          |> Map.put(:game_over?, true)
 
-      broadcast(socket, "new_event", call_msg)
+        broadcast(socket, "new_event", call_msg)
+        broadcast(socket, "new_game", msg.game_msg)
+      else
+        call_msg =
+          msg.call_msg
+          |> Map.put(:game_over?, false)
+
+        broadcast(socket, "new_event", call_msg)
+      end
     end
   end
 
@@ -207,9 +250,6 @@ defmodule GagaWeb.TableChannel do
     )
 
     {:noreply, socket}
-  end
-
-  def handle_all_in() do
   end
 
   def leave(room_id, user_id) do

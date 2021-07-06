@@ -42,6 +42,7 @@ defmodule Helpers.Game do
     # send message telling who won and how maybe add the kicker that won it if its a tie?
     end_game(prev_game_id)
     users = Poker.get_users_at_table(room_id)
+    IO.inspect(users)
 
     new_game_id = start_game(users, room_id, false, prev_game_id)
 
