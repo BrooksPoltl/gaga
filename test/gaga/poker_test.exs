@@ -10,12 +10,24 @@ defmodule PokerTest do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(Gaga.Repo)
   end
 
-  def start_game() do
+  def start_game_two_users() do
     user1 = insert(:user)
     user2 = insert(:user)
     room1 = insert(:room, user: user1)
     insert(:room_user, user_id: user1.id, room_id: room1.id)
     insert(:room_user, user_id: user2.id, room_id: room1.id)
+    table_users = Gaga.Poker.get_users_at_table(room1.id)
+    Helpers.Game.start_game(table_users, room1.id)
+  end
+
+  def start_game_three_users() do
+    user1 = insert(:user)
+    user2 = insert(:user)
+    user3 = insert(:user)
+    room1 = insert(:room, user: user1)
+    insert(:room_user, user_id: user1.id, room_id: room1.id)
+    insert(:room_user, user_id: user2.id, room_id: room1.id)
+    insert(:room_user, user_id: user3.id, room_id: room1.id)
     table_users = Gaga.Poker.get_users_at_table(room1.id)
     Helpers.Game.start_game(table_users, room1.id)
   end
@@ -82,7 +94,7 @@ defmodule PokerTest do
     end
 
     test "starts game" do
-      IO.inspect(start_game())
+      IO.inspect(start_game_three_users())
       assert false == true
     end
   end
