@@ -23,44 +23,53 @@ defmodule Helpers.Game do
   end
 
   def start_game(table, room_id, first_game \\ true, prev_game_id \\ 0) do
-    if first_game do
-      big_user = Enum.at(table, 0)
-      small_user = Enum.at(table, 1)
-      game_id = create_game(table, room_id, big_user.user_id, small_user.user_id)
-      game_id
-    else
-      # logic to determine big/small blinds
-      # big and small blind might leave table.
-      next_blinds = Poker.get_next_blind_user_ids(table, prev_game_id)
-      # if they do we need to still get their created dates to use their dates
-      game_id = create_game(table, room_id, next_blinds.big_user_id, next_blinds.small_user_id)
-      game_id
+    if length(table) > 1 do
+      if first_game do
+        big_user = Enum.at(table, 0)
+        small_user = Enum.at(table, 1)
+        game_id = create_game(table, room_id, big_user.user_id, small_user.user_id)
+        game_id
+      else
+        # logic to determine big/small blinds
+        # big and small blind might leave table.
+        next_blinds = Poker.get_next_blind_user_ids(table, prev_game_id)
+        # if they do we need to still get their created dates to use their dates
+        game_id = create_game(table, room_id, next_blinds.big_user_id, next_blinds.small_user_id)
+        game_id
+      end
     end
   end
 
   def start_and_send_game(room_id, prev_game_id) do
     # send message telling who won and how maybe add the kicker that won it if its a tie?
-    end_game(prev_game_id)
     users = Poker.get_users_at_table(room_id)
-    IO.inspect(users)
 
-    new_game_id = start_game(users, room_id, false, prev_game_id)
+    if length(users) >= 2 do
+      new_game_id = start_game(users, room_id, false, prev_game_id)
 
-    new_game = Poker.get_game_by_id(new_game_id)
-    new_hands = Poker.get_hands_by_game_id(new_game_id)
-    user_id = Poker.find_active_user_by_game_id(new_game_id)
+      new_game = Poker.get_game_by_id(new_game_id)
+      new_hands = Poker.get_hands_by_game_id(new_game_id)
+      user_id = Poker.find_active_user_by_game_id(new_game_id)
 
-    %{
-      game: new_game,
-      hands: new_hands,
-      user_id: user_id
-    }
+      %{
+        game: new_game,
+        hands: new_hands,
+        user_id: user_id
+      }
+    else
+      false
+    end
   end
 
   def end_game(game_id) do
-    hands = Poker.get_hands_by_game_id(game_id)
+    hands =
+      Poker.get_hands_by_game_id(game_id)
+      |> Enum.filter(&(&1.is_active == true))
+
     game = Poker.get_game_by_id(game_id)
     # Need to validate and check side games and determine winners
+    # Find min amount bet this round
+    # IO.inspect(PokerLogic.find_side_bets(hands, []))
     winner = Poker.determine_winners(game, hands)
     total = game.pot_size / length(winner)
 

@@ -50,6 +50,10 @@ defmodule Gaga.Poker do
     |> Repo.insert()
   end
 
+  def get_user_by_id(user_id) do
+    Repo.get_by(User, id: user_id)
+  end
+
   def bet_amount(user_id, amt) do
     user = Repo.get_by(User, id: user_id)
 
@@ -181,6 +185,8 @@ defmodule Gaga.Poker do
         }
       )
 
+    IO.puts("Vals")
+
     vals = Repo.all(query)
     first = Enum.at(vals, 0)
 
@@ -198,9 +204,9 @@ defmodule Gaga.Poker do
 
     query2 =
       from(h in "hands",
-        join: u in Users,
+        join: u in User,
         on: [id: h.user_id],
-        where: h.game_id == ^game_id and h.is_active == true and u.cash != 0,
+        where: h.game_id == ^game_id and h.is_active == true,
         select: %{user_id: h.user_id}
       )
 
@@ -303,18 +309,18 @@ defmodule Gaga.Poker do
 
     create_event(%{
       type: "ante",
-      user_id: big_user_id,
+      user_id: small_user_id,
       game_id: game.id,
-      amount: 40,
+      amount: 20,
       inserted_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second),
       updated_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
     })
 
     create_event(%{
       type: "ante",
-      user_id: small_user_id,
+      user_id: big_user_id,
       game_id: game.id,
-      amount: 20,
+      amount: 40,
       inserted_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second),
       updated_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
     })
@@ -335,6 +341,16 @@ defmodule Gaga.Poker do
         where: e.round == ^round and e.game_id == ^game_id
       )
 
+    sub_query2 =
+      from(e in "events",
+        group_by: [e.user_id, e.game_id],
+        select: %{
+          user_id: e.user_id,
+          amount_bet_this_game: sum(e.amount)
+        },
+        where: e.game_id == ^game_id
+      )
+
     get_hands =
       from(h in "hands",
         join: game in Game,
@@ -345,6 +361,8 @@ defmodule Gaga.Poker do
         on: [id: h.user_id],
         left_join: su in subquery(sub_query),
         on: su.user_id == h.user_id,
+        left_join: su2 in subquery(sub_query2),
+        on: su2.user_id == h.user_id,
         select: %{
           id: h.id,
           card1: h.card1,
@@ -353,7 +371,8 @@ defmodule Gaga.Poker do
           name: u.name,
           cash: u.cash,
           is_active: h.is_active,
-          amount_bet_this_round: su.amount_bet_this_round
+          amount_bet_this_round: su.amount_bet_this_round,
+          amount_bet_this_game: su2.amount_bet_this_game
         },
         where: h.game_id == ^game_id,
         order_by: [asc: u.inserted_at]
@@ -543,10 +562,20 @@ defmodule Gaga.Poker do
 
     user_bet_amount = Repo.one(amount_to_call_query)
 
+    user = Repo.get_by(User, id: user_id)
+
     if(user_bet_amount == nil) do
-      max_amount
+      if user.cash < max_amount do
+        user.cash
+      else
+        max_amount
+      end
     else
-      max_amount - user_bet_amount
+      if user.cash < max_amount do
+        user.cash
+      else
+        max_amount - user_bet_amount
+      end
     end
   end
 
@@ -562,44 +591,25 @@ defmodule Gaga.Poker do
       from(e in "events",
         select: %{id: e.id, user_id: e.user_id},
         limit: 1,
-        where: e.game_id == ^game_id and e.type != "ante",
-        order_by: [desc: :inserted_at]
+        where: e.game_id == ^game_id,
+        order_by: [desc: :id]
       )
 
     event = Repo.one(get_event)
+    IO.inspect(event)
+    get_users = get_hands_by_game_id(game_id)
 
-    if event == nil do
-      get_users = get_hands_by_game_id(game_id)
-      big_user_id = get_big_user_id(game_id)
-      reverse_users = Enum.reverse(get_users)
-      big_user_index = Enum.find_index(reverse_users, fn x -> x.user_id == big_user_id end)
+    reverse_users = Enum.reverse(get_users)
+    event_user_index = Enum.find_index(reverse_users, fn x -> x.user_id == event.user_id end)
+    {start, end_enum} = Enum.split(reverse_users, event_user_index)
 
-      {start, end_enum} = Enum.split(reverse_users, big_user_index)
+    concat_user =
+      [end_enum, start]
+      |> Enum.concat()
 
-      concat_user =
-        [end_enum, start]
-        |> Enum.concat()
-
-      if length(concat_user) == 2 do
-        Enum.at(get_users, length(get_users) - 1).user_id
-      else
-        get_rid_of_first_two = Enum.slice(concat_user, 2, length(concat_user))
-        Enum.at(Enum.reverse(get_rid_of_first_two), 0).user_id
-      end
-    else
-      get_users = get_hands_by_game_id(game_id)
-
-      reverse_users = Enum.reverse(get_users)
-      event_user_index = Enum.find_index(reverse_users, fn x -> x.user_id == event.user_id end)
-      {start, end_enum} = Enum.split(reverse_users, event_user_index)
-
-      concat_user =
-        [end_enum, start]
-        |> Enum.concat()
-
-      get_rid_of_first = Enum.slice(concat_user, 1, length(concat_user))
-      Enum.find(Enum.reverse(get_rid_of_first), fn x -> x.is_active and x.cash != 0 end).user_id
-    end
+    get_rid_of_first = Enum.slice(concat_user, 1, length(concat_user))
+    IO.inspect(get_rid_of_first)
+    Enum.find(Enum.reverse(get_rid_of_first), fn x -> x.is_active and x.cash != 0 end).user_id
   end
 
   def join_room(attrs \\ %{}) do

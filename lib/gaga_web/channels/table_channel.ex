@@ -12,10 +12,9 @@ defmodule GagaWeb.TableChannel do
     {:ok, assign(socket, :room_id, room_id)}
   end
 
-  def handle_in("get_table", body, socket) do
+  def handle_in("get_table", _body, socket) do
     room_id = socket.assigns.room_id
     table_users = Poker.get_users_at_table(room_id)
-    IO.inspect(table_users)
 
     cond do
       length(table_users) == 2 ->
@@ -79,13 +78,19 @@ defmodule GagaWeb.TableChannel do
 
   def handle_out("new_game", msg, socket) do
     Process.sleep(5000)
-    hands = PokerLogic.blur_other_hands(msg.hands, socket.assigns.user_id)
 
-    push(
-      socket,
-      "new_game",
-      %{game: msg.game, hands: hands, user_id: msg.user_id}
-    )
+    if msg.game_msg == false do
+      users = Poker.get_users_at_table(socket.assigns.room_id)
+      broadcast(socket, "game_over", %{users: users})
+    else
+      hands = PokerLogic.blur_other_hands(msg.game_msg.hands, socket.assigns.user_id)
+
+      push(
+        socket,
+        "new_game",
+        %{game: msg.game_msg.game, hands: hands, user_id: msg.game_msg.user_id}
+      )
+    end
 
     {:noreply, socket}
   end
@@ -94,6 +99,9 @@ defmodule GagaWeb.TableChannel do
     # Validate that the right person is betting
     game_id = Map.get(body, "gameId")
     active_user_id = Poker.find_active_user_by_game_id(game_id)
+
+    IO.inspect(active_user_id)
+    IO.inspect(socket.assigns.user_id)
 
     if active_user_id == socket.assigns.user_id do
       # Create the event
@@ -119,8 +127,6 @@ defmodule GagaWeb.TableChannel do
   end
 
   def handle_out("new_event", msg, socket) do
-    IO.inspect("CREATING A NEW EVENT")
-
     if msg.type == "all-in" do
       # show all active cards
 
@@ -173,7 +179,7 @@ defmodule GagaWeb.TableChannel do
       # end game
       Helpers.Game.end_game(msg.game.id)
       new_game_msg = Helpers.Game.start_and_send_game(socket.assigns.room_id, msg.game.id)
-      push(socket, "new_game", new_game_msg)
+      broadcast(socket, "new_game", %{game_msg: new_game_msg})
     else
       # turn next card
       game = Poker.increment_round_and_get_game(msg.game.id)
@@ -182,7 +188,6 @@ defmodule GagaWeb.TableChannel do
         msg
         |> Map.put(:game, game)
 
-      Process.sleep(2000)
       push(socket, "new_event", new_msg)
       allin(socket, new_msg)
     end
@@ -199,7 +204,7 @@ defmodule GagaWeb.TableChannel do
         |> Map.put(:game_over?, active_hands?)
 
       broadcast(socket, "new_event", fold_msg)
-      broadcast(socket, "new_game", msg.game_msg)
+      broadcast(socket, "new_game", %{game_msg: msg.game_msg})
     else
       fold_msg =
         msg.fold_msg
@@ -212,7 +217,7 @@ defmodule GagaWeb.TableChannel do
   def call(socket, game_id) do
     msg = Helpers.Event.handle_call(socket.assigns.user_id, game_id, socket.assigns.room_id)
 
-    if msg.type == "all-in" do
+    if Map.has_key?(msg, :type) and msg.type == "all-in" do
       broadcast(socket, "new_event", msg)
     else
       if msg.game_msg != nil do
@@ -221,7 +226,7 @@ defmodule GagaWeb.TableChannel do
           |> Map.put(:game_over?, true)
 
         broadcast(socket, "new_event", call_msg)
-        broadcast(socket, "new_game", msg.game_msg)
+        broadcast(socket, "new_game", %{game_msg: msg.game_msg})
       else
         call_msg =
           msg.call_msg
@@ -233,11 +238,23 @@ defmodule GagaWeb.TableChannel do
   end
 
   def make_raise(socket, game_id, amt) do
-    raise_msg =
-      Helpers.Event.handle_raise(socket.assigns.user_id, game_id, amt)
-      |> Map.put(:game_over?, false)
+    msg = Helpers.Event.handle_raise(socket.assigns.user_id, game_id, amt)
 
-    broadcast!(socket, "new_event", raise_msg)
+    if msg.turn.user_id == 0 do
+      raise_msg =
+        msg
+        |> Map.put(:game_over?, true)
+
+      broadcast!(socket, "new_event", raise_msg)
+      IO.puts("CALLING ALL IN")
+      allin(socket, raise_msg)
+    else
+      raise_msg =
+        msg
+        |> Map.put(:game_over?, false)
+
+      broadcast!(socket, "new_event", raise_msg)
+    end
   end
 
   def handle_out("new_turn", msg, socket) do

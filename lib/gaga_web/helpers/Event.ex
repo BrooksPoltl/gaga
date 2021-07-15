@@ -70,12 +70,9 @@ defmodule Helpers.Event do
     hands = Poker.get_hands_by_game_id(game_id)
 
     is_all_in? = PokerLogic.is_everyone_all_in?(hands)
-    IO.inspect(hands)
+    game = Poker.get_game_by_id(game_id)
 
     if is_all_in? do
-      IO.puts("WE ALL IN BABY")
-      game = Poker.get_game_by_id(game_id)
-
       %{
         type: "all-in",
         amt: amount_to_call,
@@ -85,8 +82,6 @@ defmodule Helpers.Event do
       }
     else
       next_user_id = Poker.find_active_user_by_game_id(game_id)
-
-      game = Poker.get_game_by_id(game_id)
 
       call_msg = %{
         type: "call",
@@ -126,8 +121,9 @@ defmodule Helpers.Event do
   end
 
   def handle_raise(user_id, game_id, amt) do
+    user = Poker.get_user_by_id(user_id)
     amount_to_call = Poker.calculate_amount_to_call(user_id, game_id)
-    raise_amount = amount_to_call + amt
+    raise_amount = PokerLogic.limit_raise(user.cash, amount_to_call, amt)
 
     event = %{
       type: "raise",
@@ -139,17 +135,29 @@ defmodule Helpers.Event do
     }
 
     Poker.create_event(event)
-    next_user_id = Poker.find_active_user_by_game_id(game_id)
 
     hands = Poker.get_hands_by_game_id(game_id)
     game = Poker.get_game_by_id(game_id)
+    is_all_in? = PokerLogic.is_everyone_all_in?(hands)
 
-    %{
-      type: "raise",
-      amt: amt,
-      game: game,
-      user_id: user_id,
-      turn: %{user_id: next_user_id, hands: hands}
-    }
+    if is_all_in? do
+      %{
+        type: "all-in",
+        amt: amt,
+        game: game,
+        user_id: user_id,
+        turn: %{user_id: 0, hands: hands}
+      }
+    else
+      next_user_id = Poker.find_active_user_by_game_id(game_id)
+
+      %{
+        type: "raise",
+        amt: amt,
+        game: game,
+        user_id: user_id,
+        turn: %{user_id: next_user_id, hands: hands}
+      }
+    end
   end
 end

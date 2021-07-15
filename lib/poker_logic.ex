@@ -96,10 +96,10 @@ defmodule PokerLogic do
     # IF there is only 1 person not all in that means there is no one left to play
     able_to_play =
       Enum.filter(hands, fn x ->
-        x.cash != 0
+        x.cash != 0 and x.is_active == true
       end)
 
-    length(able_to_play) < 2
+    length(able_to_play) < 1
   end
 
   def blur_other_hands(hands, user_id) do
@@ -124,5 +124,24 @@ defmodule PokerLogic do
         |> Map.put(:card2, nil)
       end
     end)
+  end
+
+  def find_side_bets(hands, acc) do
+    if length(hands) == 0 do
+      acc
+    else
+      min_value = Enum.min_by(hands, & &1.amount_bet_this_game)
+      filtered_hands = Enum.filter(hands, fn x -> x.amount_bet_this_game > min_value end)
+      IO.inspect(filtered_hands)
+      find_side_bets(filtered_hands, acc ++ %{eligible: hands})
+    end
+  end
+
+  def limit_raise(cash, amount_to_call, amt) do
+    if cash < amount_to_call + amt do
+      cash
+    else
+      amount_to_call + amt
+    end
   end
 end
