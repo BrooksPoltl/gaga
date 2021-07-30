@@ -101,4 +101,50 @@ defmodule PokerLogicTest do
     assert score.name == :straight_flush
     assert Enum.at(score.tie_breaking_ranks, 0) == 12
   end
+
+  test "find_side_bets all equal bets" do
+    hands = [%{amount_bet_this_game: 10000}, %{amount_bet_this_game: 10000}]
+    side_bets = PokerLogic.find_side_bets(hands, [])
+    assert side_bets == [[%{amount_bet_this_game: 10000}, %{amount_bet_this_game: 10000}]]
+  end
+
+  test "find_side_bets 1 person bet more" do
+    hands = [
+      %{amount_bet_this_game: 10000},
+      %{amount_bet_this_game: 10000},
+      %{amount_bet_this_game: 10001}
+    ]
+
+    side_bets = PokerLogic.find_side_bets(hands, [])
+
+    assert side_bets == [
+             [
+               %{amount_bet_this_game: 10000},
+               %{amount_bet_this_game: 10000},
+               %{amount_bet_this_game: 10001}
+             ],
+             [%{amount_bet_this_game: 10001}]
+           ]
+  end
+
+  test "find_side_bets 2 seperate side bets" do
+    hands = [
+      %{amount_bet_this_game: 10000},
+      %{amount_bet_this_game: 10000},
+      %{amount_bet_this_game: 10001},
+      %{amount_bet_this_game: 10001}
+    ]
+
+    side_bets = PokerLogic.find_side_bets(hands, [])
+
+    assert side_bets == [
+             [
+               %{amount_bet_this_game: 10000},
+               %{amount_bet_this_game: 10000},
+               %{amount_bet_this_game: 10001},
+               %{amount_bet_this_game: 10001}
+             ],
+             [%{amount_bet_this_game: 10001}, %{amount_bet_this_game: 10001}]
+           ]
+  end
 end

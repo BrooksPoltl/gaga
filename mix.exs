@@ -20,7 +20,7 @@ defmodule Gaga.MixProject do
   def application do
     [
       mod: {Gaga.Application, []},
-      extra_applications: [:ex_machina, :logger, :runtime_tools]
+      extra_applications: [:logger, :runtime_tools]
     ]
   end
 

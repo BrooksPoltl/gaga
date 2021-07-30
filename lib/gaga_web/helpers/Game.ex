@@ -69,13 +69,13 @@ defmodule Helpers.Game do
     game = Poker.get_game_by_id(game_id)
     # Need to validate and check side games and determine winners
     # Find min amount bet this round
-    # IO.inspect(PokerLogic.find_side_bets(hands, []))
-    winner = Poker.determine_winners(game, hands)
-    total = game.pot_size / length(winner)
-
-    Enum.each(winner, fn x ->
-      Poker.give_user_money(x.user_id, round(total))
-    end)
+    IO.inspect(game)
+    side_bets = PokerLogic.find_side_bets(hands, [])
+    IO.inspect(side_bets)
+    PokerLogic.evaluate_side_bets(game, side_bets, [], 0)
+    # Enum.each(winner, fn x ->
+    #   Poker.give_user_money(x.user_id, floor(total))
+    # end)
   end
 
   def handle_rounds_return_game_hands(hands, game_id) do

@@ -338,7 +338,7 @@ defmodule Gaga.Poker do
           user_id: e.user_id,
           amount_bet_this_round: sum(e.amount)
         },
-        where: e.round == ^round and e.game_id == ^game_id
+        where: e.round == ^round and e.game_id == ^game_id and e.type != "ante"
       )
 
     sub_query2 =
@@ -420,85 +420,6 @@ defmodule Gaga.Poker do
     |> Map.put(:card3, set_value_if_true(game.card3, game.shown_flop))
     |> Map.put(:card4, set_value_if_true(game.card4, game.shown_turn))
     |> Map.put(:card5, set_value_if_true(game.card5, game.shown_river))
-  end
-
-  def break_ties(hands) do
-    max_value =
-      Enum.reduce(hands, 0, fn x, acc ->
-        val = Enum.at(x.tie_breaking_ranks, 0)
-
-        if val > acc do
-          val
-        else
-          acc
-        end
-      end)
-
-    filtered_hands =
-      hands
-      |> Enum.filter(&(Enum.at(&1.tie_breaking_ranks, 0) == max_value))
-
-    if(
-      length(filtered_hands) == 1 or length(Enum.at(filtered_hands, 0).tie_breaking_ranks) == 1
-    ) do
-      filtered_hands
-    else
-      pivoted_hands =
-        Enum.map(filtered_hands, fn x ->
-          new_tie_breaks =
-            x.tie_breaking_ranks
-            |> tl()
-
-          Map.put(x, :tie_breaking_ranks, new_tie_breaks)
-        end)
-
-      break_ties(pivoted_hands)
-    end
-  end
-
-  def evaluate_results(hands) do
-    max_value =
-      Enum.reduce(hands, 0, fn x, acc ->
-        if x.value > acc do
-          x.value
-        else
-          acc
-        end
-      end)
-
-    ties =
-      hands
-      |> Enum.filter(&(&1.value == max_value))
-
-    break_ties(ties)
-  end
-
-  def determine_winners(game, hands) do
-    active_hands = Enum.filter(hands, fn x -> x.is_active == true end)
-
-    if length(active_hands) == 1 do
-      active_hands
-    else
-      scores =
-        Enum.map(active_hands, fn x ->
-          PokerLogic.evaluate_score([
-            game.card1,
-            game.card2,
-            game.card3,
-            game.card4,
-            game.card5,
-            x.card1,
-            x.card2
-          ])
-        end)
-
-      attach_scores =
-        Enum.map(0..(length(active_hands) - 1), fn x ->
-          Map.merge(Enum.at(active_hands, x), Enum.at(scores, x))
-        end)
-
-      evaluate_results(attach_scores)
-    end
   end
 
   def get_game_by_id(game_id) do
@@ -596,7 +517,6 @@ defmodule Gaga.Poker do
       )
 
     event = Repo.one(get_event)
-    IO.inspect(event)
     get_users = get_hands_by_game_id(game_id)
 
     reverse_users = Enum.reverse(get_users)
@@ -608,7 +528,6 @@ defmodule Gaga.Poker do
       |> Enum.concat()
 
     get_rid_of_first = Enum.slice(concat_user, 1, length(concat_user))
-    IO.inspect(get_rid_of_first)
     Enum.find(Enum.reverse(get_rid_of_first), fn x -> x.is_active and x.cash != 0 end).user_id
   end
 

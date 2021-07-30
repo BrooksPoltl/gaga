@@ -25,6 +25,22 @@ defmodule Gaga.Factory do
     }
   end
 
+  def event_factory(attrs) do
+    type = Map.get(attrs, :type, "call")
+    amount = Map.get(attrs, :amount, 0)
+    round = Map.get(attrs, :round, 0)
+    user_id = Map.get(attrs, :user_id)
+    game_id = Map.get(attrs, :game_id)
+
+    %Gaga.Poker.Event{
+      type: type,
+      amount: amount,
+      round: round,
+      user_id: user_id,
+      game_id: game_id
+    }
+  end
+
   # def article_factory do
   #   title = sequence(:title, &"Use ExMachina! (Part #{&1})")
   #   # derived attribute

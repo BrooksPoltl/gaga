@@ -100,9 +100,6 @@ defmodule GagaWeb.TableChannel do
     game_id = Map.get(body, "gameId")
     active_user_id = Poker.find_active_user_by_game_id(game_id)
 
-    IO.inspect(active_user_id)
-    IO.inspect(socket.assigns.user_id)
-
     if active_user_id == socket.assigns.user_id do
       # Create the event
       cond do
@@ -246,7 +243,6 @@ defmodule GagaWeb.TableChannel do
         |> Map.put(:game_over?, true)
 
       broadcast!(socket, "new_event", raise_msg)
-      IO.puts("CALLING ALL IN")
       allin(socket, raise_msg)
     else
       raise_msg =

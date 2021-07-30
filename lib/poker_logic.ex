@@ -93,7 +93,6 @@ defmodule PokerLogic do
   end
 
   def is_everyone_all_in?(hands) do
-    # IF there is only 1 person not all in that means there is no one left to play
     able_to_play =
       Enum.filter(hands, fn x ->
         x.cash != 0 and x.is_active == true
@@ -127,13 +126,12 @@ defmodule PokerLogic do
   end
 
   def find_side_bets(hands, acc) do
-    if length(hands) == 0 do
+    if length(hands) < 1 do
       acc
     else
-      min_value = Enum.min_by(hands, & &1.amount_bet_this_game)
+      min_value = Enum.min_by(hands, & &1.amount_bet_this_game).amount_bet_this_game
       filtered_hands = Enum.filter(hands, fn x -> x.amount_bet_this_game > min_value end)
-      IO.inspect(filtered_hands)
-      find_side_bets(filtered_hands, acc ++ %{eligible: hands})
+      find_side_bets(filtered_hands, acc ++ [hands])
     end
   end
 
@@ -143,5 +141,88 @@ defmodule PokerLogic do
     else
       amount_to_call + amt
     end
+  end
+
+  def break_ties(hands) do
+    max_value =
+      Enum.reduce(hands, 0, fn x, acc ->
+        val = Enum.at(x.tie_breaking_ranks, 0)
+
+        if val > acc do
+          val
+        else
+          acc
+        end
+      end)
+
+    filtered_hands =
+      hands
+      |> Enum.filter(&(Enum.at(&1.tie_breaking_ranks, 0) == max_value))
+
+    if(
+      length(filtered_hands) == 1 or length(Enum.at(filtered_hands, 0).tie_breaking_ranks) == 1
+    ) do
+      filtered_hands
+    else
+      pivoted_hands =
+        Enum.map(filtered_hands, fn x ->
+          new_tie_breaks =
+            x.tie_breaking_ranks
+            |> tl()
+
+          Map.put(x, :tie_breaking_ranks, new_tie_breaks)
+        end)
+
+      break_ties(pivoted_hands)
+    end
+  end
+
+  def evaluate_results(hands) do
+    max_value =
+      Enum.reduce(hands, 0, fn x, acc ->
+        if x.value > acc do
+          x.value
+        else
+          acc
+        end
+      end)
+
+    ties =
+      hands
+      |> Enum.filter(&(&1.value == max_value))
+
+    break_ties(ties)
+  end
+
+  def determine_winners(game, hands) do
+    active_hands = Enum.filter(hands, fn x -> x.is_active == true end)
+
+    if length(active_hands) == 1 do
+      active_hands
+    else
+      scores =
+        Enum.map(active_hands, fn x ->
+          evaluate_score([
+            game.card1,
+            game.card2,
+            game.card3,
+            game.card4,
+            game.card5,
+            x.card1,
+            x.card2
+          ])
+        end)
+
+      attach_scores =
+        Enum.map(0..(length(active_hands) - 1), fn x ->
+          Map.merge(Enum.at(active_hands, x), Enum.at(scores, x))
+        end)
+
+      evaluate_results(attach_scores)
+    end
+  end
+
+  def evaluate_side_bets(game, side_bets, acc, paid_out) do
+    # take
   end
 end
