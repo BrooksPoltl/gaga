@@ -41,7 +41,7 @@ defmodule PokerTest do
         }
       ]
 
-      result = Gaga.Poker.break_ties(hands)
+      result = PokerLogic.break_ties(hands)
       assert Enum.at(result, 0).user_id == 61
     end
 
@@ -57,7 +57,7 @@ defmodule PokerTest do
         }
       ]
 
-      result = Gaga.Poker.break_ties(hands)
+      result = PokerLogic.break_ties(hands)
       assert length(result) == 2
     end
 
@@ -73,7 +73,7 @@ defmodule PokerTest do
         }
       ]
 
-      result = Gaga.Poker.break_ties(hands)
+      result = PokerLogic.break_ties(hands)
       assert Enum.at(result, 0).user_id == 61
     end
 
@@ -89,7 +89,7 @@ defmodule PokerTest do
         }
       ]
 
-      result = Gaga.Poker.break_ties(hands)
+      result = PokerLogic.break_ties(hands)
       assert Enum.at(result, 0).user_id == 62
     end
   end
@@ -128,7 +128,7 @@ defmodule PokerTest do
         %{id: 2, value: 1, tie_breaking_ranks: [1, 2, 3]}
       ]
 
-      winners = Gaga.Poker.evaluate_results(hands)
+      winners = PokerLogic.evaluate_results(hands)
 
       assert Enum.at(winners, 0).id == 1
     end
